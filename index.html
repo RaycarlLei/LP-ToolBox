@@ -503,6 +503,23 @@
       display: inline-flex;
       align-items: center;
       gap: 4px;
+      transition: opacity 0.2s ease;
+    }
+
+    .chart-legend-item:hover {
+      opacity: 0.8;
+    }
+
+    .chart-legend-item.legend-hidden {
+      opacity: 0.4;
+    }
+
+    .chart-legend-item.legend-hidden .legend-dot {
+      opacity: 0.4;
+    }
+
+    .chart-legend-item.legend-hidden span:not(.legend-dot) {
+      text-decoration: line-through;
     }
 
     .legend-dot {
@@ -551,6 +568,73 @@
       }
     }
 
+    /* Popular pools selection bar */
+    .popular-pools-container {
+      margin-bottom: 12px;
+      overflow: hidden;
+      position: relative;
+      padding: 8px 0;
+      mask-image: linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%);
+      -webkit-mask-image: linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%);
+    }
+
+    .popular-pools-scroll {
+      display: flex;
+      gap: 8px;
+      animation: scrollHorizontal 40s linear infinite;
+      width: fit-content;
+    }
+
+    .popular-pools-scroll:hover {
+      animation-play-state: paused;
+    }
+
+    @keyframes scrollHorizontal {
+      0% {
+        transform: translateX(0);
+      }
+      100% {
+        transform: translateX(-50%);
+      }
+    }
+
+    .popular-pool-item {
+      padding: 6px 12px;
+      border-radius: var(--radius-md);
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      background: rgba(15, 23, 42, 0.6);
+      color: var(--text-main);
+      font-size: 12px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s ease;
+      user-select: none;
+      flex-shrink: 0;
+    }
+
+    .popular-pool-item:hover {
+      background: rgba(34, 197, 94, 0.15);
+      border-color: rgba(34, 197, 94, 0.4);
+      transform: translateY(-1px);
+    }
+
+    .popular-pool-item:active {
+      transform: translateY(0);
+      background: rgba(34, 197, 94, 0.2);
+    }
+
+    .popular-pools-scroll::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 40px;
+      height: 100%;
+      background: linear-gradient(to right, transparent, rgba(15, 23, 42, 0.95));
+      pointer-events: none;
+      z-index: 1;
+    }
+
     @media (max-width: 640px) {
       body {
         padding-top: 22px;
@@ -579,12 +663,11 @@
   <main class="main">
     <header class="page-header">
       <div class="page-title-row">
-        <h1>SOL / USDC Pool Viewer</h1>
-        <span class="pill">PancakeSwap V3 · Solana</span>
+        <h1>Liquidity Pool Tracker</h1>
+        <span class="pill">Solana</span>
       </div>
       <p class="tagline">
-        Live pool metrics fetched from the GeckoTerminal DEX API
-        (<code>network = solana</code>, <code>dex = pancakeswap-v3</code>).
+        <code>Live pool metrics fetched from the GeckoTerminal DEX API</code>
       </p>
     </header>
 
@@ -592,6 +675,12 @@
       <div class="card-header">
         <div class="card-title">Pool ID</div>
         <span class="badge">GeckoTerminal Pool Address</span>
+      </div>
+
+      <div class="popular-pools-container">
+        <div class="popular-pools-scroll" id="popularPoolsScroll">
+          <!-- Popular pools will be duplicated for seamless loop -->
+        </div>
       </div>
 
       <label for="poolId">Paste any Solana pool address to inspect its stats.</label>
@@ -607,19 +696,38 @@
            Load Pool
         </button>
       </div>
-      <div class="input-row" style="margin-top: 10px;">
-        <input
-          id="birdeyeApiKey"
-          type="text"
-          value="2412d6b52e4b4d9095f9a5991ea8196c"
-          placeholder="Birdeye API Key (for TVL / volume)"
-        />
-        <button id="checkBirdeyeKeyBtn">
-          <span class="button-icon"></span>
-          Check Key
+      <div style="margin-top: 10px;">
+        <button 
+          id="toggleCustomKeyBtn" 
+          type="button"
+          style="padding: 0; margin: 0; border: none; background: transparent; box-shadow: none; outline: none; cursor: pointer;"
+        >
+          <span id="toggleCustomKeyText" style="color: rgba(148, 163, 184, 0.4); font-size: 10px; font-family: monospace;">api_key_config</span>
+          <span id="toggleCustomKeyArrow" style="margin-left: 6px; color: rgba(148, 163, 184, 0.4); font-size: 10px;">▼</span>
         </button>
+        <div id="customKeySection" style="display: none; margin-top: 8px;">
+          <div class="input-row">
+            <input
+              id="birdeyeApiKey"
+              type="password"
+              placeholder="Enter your Birdeye API Key"
+              autocomplete="off"
+            />
+            <button id="toggleKeyVisibilityBtn" type="button" title="Show/Hide API Key" style="padding: 9px 12px;">
+              👁️
+            </button>
+            <button id="checkBirdeyeKeyBtn">
+              <span class="button-icon"></span>
+              Check Key
+            </button>
+          </div>
+          <div class="small" id="birdeyeStatus" style="margin-top: 4px; opacity: 0.9;"></div>
+
+        </div>
+        <div class="small" style="margin-top: 6px; opacity: 0.8; color: var(--text-muted);">
+          Default uses built-in API Key. To use your own Key, please click the button above.
+        </div>
       </div>
-      <div class="small" id="birdeyeStatus" style="margin-top: 4px; opacity: 0.9;"></div>
       <div class="small loading-text" id="loading"></div>
       <div id="error" class="error"></div>
     </div>
@@ -666,21 +774,25 @@
             <span class="legend-dot" style="background: #1d5331;"></span>
             <span>TVL (USD)</span>
           </div>
-          <div class="chart-legend-item">
+          <div class="chart-legend-item" id="volumeLegend">
             <span class="legend-dot" style="background: rgba(148, 163, 184, 0.9);"></span>
             <span>Daily Volume (USD)</span>
           </div>
-          <div class="chart-legend-item">
+          <div class="chart-legend-item" id="token0HighLegend">
             <span class="legend-dot" style="background: rgba(250, 204, 21, 0.9);"></span>
-            <span>High Price</span>
+            <span id="token0HighLabel">High Price</span>
           </div>
-          <div class="chart-legend-item">
+          <div class="chart-legend-item" id="token0LowLegend">
             <span class="legend-dot" style="background: rgba(248, 113, 113, 0.9);"></span>
-            <span>Low Price</span>
+            <span id="token0LowLabel">Low Price</span>
           </div>
-          <div class="chart-legend-item">
-            <span class="legend-dot" style="background: rgba(244, 114, 182, 0.9);"></span>
-            <span>Trades Count</span>
+          <div class="chart-legend-item" id="token1HighLegend">
+            <span class="legend-dot" style="background: rgba(59, 130, 246, 0.9);"></span>
+            <span id="token1HighLabel">High Price</span>
+          </div>
+          <div class="chart-legend-item" id="token1LowLegend">
+            <span class="legend-dot" style="background: rgba(139, 92, 246, 0.9);"></span>
+            <span id="token1LowLabel">Low Price</span>
           </div>
         </div>
       </div>
@@ -719,11 +831,10 @@
       </div>
 
       <p class="small" style="margin-bottom: 10px;">
-        输入集中流动性区间、当前价格、日波动率和时间长度，使用几何布朗运动对未来价格做
-        Monte Carlo 模拟，估算期望 IL、分布和置信区间。
+        Enter the concentrated liquidity range, current price, daily volatility, and time period. Use geometric Brownian motion to perform Monte Carlo simulation on future prices, estimating expected IL, distribution, and confidence intervals.
       </p>
 
-      <!-- 输入区域 -->
+      <!-- Input Area -->
       <div class="stat-grid" style="margin-bottom: 8px;">
         <div class="stat">
           <div class="stat-label">Price lower bound</div>
@@ -731,7 +842,7 @@
             id="ilLower"
             type="number"
             step="0.0001"
-            placeholder="例如 100"
+            placeholder="e.g. 100"
             value="100"
           />
         </div>
@@ -741,7 +852,7 @@
             id="ilUpper"
             type="number"
             step="0.0001"
-            placeholder="例如 200"
+            placeholder="e.g. 200"
             value="200"
           />
         </div>
@@ -751,7 +862,7 @@
             id="ilP0"
             type="number"
             step="0.0001"
-            placeholder="例如 130"
+            placeholder="e.g. 130"
             value="130"
           />
         </div>
@@ -759,12 +870,12 @@
 
       <div class="stat-grid" style="margin-bottom: 4px;">
         <div class="stat">
-          <div class="stat-label">Daily volatility σ (percent)</div>
+          <div class="stat-label">Daily volatility  (percent)</div>
           <input
             id="ilSigmaDaily"
             type="number"
             step="0.01"
-            placeholder="例如 7.26 表示 7.26%"
+            placeholder="e.g. 7.26 means 7.26%"
             value="7.26"
           />
         </div>
@@ -775,7 +886,7 @@
             type="number"
             step="1"
             min="1"
-            placeholder="预测天数，例如 30"
+            placeholder="Forecast days, e.g. 30"
             value="30"
           />
         </div>
@@ -786,7 +897,7 @@
             type="number"
             step="100"
             min="100"
-            placeholder="模拟次数，默认 1000"
+            placeholder="Number of simulations, default 1000"
             value="1000"
           />
         </div>
@@ -801,7 +912,7 @@
       </div>
       <div class="error" id="ilError"></div>
 
-      <!-- 输出概览 -->
+      <!-- Output Overview -->
       <div style="margin-top: 12px;">
         <div class="muted-label" style="margin-bottom: 4px;">Simulation results</div>
         <div class="stat-grid">
@@ -828,11 +939,11 @@
         </div>
       </div>
 
-      <!-- 分布图 -->
+      <!-- Distribution Chart -->
       <div class="chart-container" style="margin-top: 12px;">
         <div class="muted-label">IL distribution (percent)</div>
         <div class="small">
-          以 Monte Carlo 模拟得到的 IL 样本为基础，将结果分箱绘制成频数直方图。
+          Based on IL samples obtained from Monte Carlo simulation, bin the results and plot as a frequency histogram.
         </div>
         <div class="chart-wrapper" style="margin-top: 10px;">
           <canvas id="ilDistributionChart"></canvas>
@@ -861,9 +972,9 @@
       }
     }
 
-    // 格式化数字为12位有效数字
+    // Format number to 12 significant digits
     function toSignificantDigits(num, digits = 12) {
-      // 确保输入是数字类型
+      // Ensure input is a number type
       if (typeof num !== 'number') {
         num = Number(num);
       }
@@ -876,22 +987,22 @@
         return "0";
       }
       
-      // 使用 toPrecision 来确保指定位数的有效数字
+      // Use toPrecision to ensure specified number of significant digits
       const formatted = num.toPrecision(digits);
       
-      // 如果结果包含科学计数法（e 或 E），直接返回
+      // If result contains scientific notation (e or E), return directly
       if (formatted.includes('e') || formatted.includes('E')) {
         return formatted;
       }
       
-      // 移除末尾不必要的零
-      // 例如：139.387752996000 -> 139.387752996
-      // 但要注意：parseFloat 可能会丢失一些精度，所以我们需要小心处理
+      // Remove trailing unnecessary zeros
+      // Example: 139.387752996000 -> 139.387752996
+      // Note: parseFloat may lose some precision, so we need to handle carefully
       const parsed = parseFloat(formatted);
       const parsedStr = parsed.toString();
       
-      // 如果解析后的字符串长度合理，使用它（更简洁）
-      // 否则使用原始 toPrecision 的结果
+      // If parsed string length is reasonable, use it (more concise)
+      // Otherwise use the original toPrecision result
       if (parsedStr.length <= formatted.length + 2) {
         return parsedStr;
       }
@@ -899,21 +1010,130 @@
       return formatted;
     }
 
-    function getBirdeyeApiKey() {
-      const el = document.getElementById("birdeyeApiKey");
-      const fallback = "2412d6b52e4b4d9095f9a5991ea8196c";
-      if (!el) return fallback;
-      const v = (el.value || "").trim();
-      return v || fallback;
+    // ========== Default API Key Configuration ==========
+    // To set a default API Key, follow these steps:
+    // 1. Run in browser console: obfuscateKey('your actual API Key')
+    // 2. Replace the DEFAULT_BIRDEYE_API_KEY_OBFUSCATED value below with the returned obfuscated string
+    // 3. Save the file
+    // 
+    // Example:
+    // const DEFAULT_BIRDEYE_API_KEY_OBFUSCATED = 'QXJhY2h5X0FQSV9LZXlfMTIzNDU2Nzg5MA==';
+    const DEFAULT_BIRDEYE_API_KEY_OBFUSCATED = 'YOUR_OBFUSCATED_KEY_HERE'; // Please replace with obfuscated API Key
+
+    // Simple obfuscation function (only to prevent casual users from seeing it, cannot prevent professional users)
+    // Warning: Pure frontend encryption cannot truly protect API Key, this is only obfuscation
+    function obfuscateKey(key) {
+      if (!key) return null;
+      // Use simple character offset + Base64 encoding
+      const offset = 13; // ROT13-like
+      let obfuscated = '';
+      for (let i = 0; i < key.length; i++) {
+        const charCode = key.charCodeAt(i);
+        obfuscated += String.fromCharCode(charCode + offset);
+      }
+      return btoa(obfuscated); // Base64 encoding
     }
 
-    let currentDays = 30; // 当前选择的天数（由滑杆控制），默认 30 天
-    let tvlVolumeChartInstance = null;
-    let storedOhlcvData = []; // 存储完整的180天数据
+    function deobfuscateKey(obfuscated) {
+      if (!obfuscated) return null;
+      try {
+        const decoded = atob(obfuscated); // Base64 decoding
+        const offset = 13;
+        let key = '';
+        for (let i = 0; i < decoded.length; i++) {
+          const charCode = decoded.charCodeAt(i);
+          key += String.fromCharCode(charCode - offset);
+        }
+        return key;
+      } catch (e) {
+        console.error('Failed to deobfuscate key:', e);
+        return null;
+      }
+    }
 
-    async function fetchOhlcv(poolId, days) {
+    // Get default API Key (if set)
+    function getDefaultBirdeyeApiKey() {
+      // Check if default Key is set (not a placeholder)
+      if (!DEFAULT_BIRDEYE_API_KEY_OBFUSCATED || DEFAULT_BIRDEYE_API_KEY_OBFUSCATED === 'YOUR_OBFUSCATED_KEY_HERE') {
+        return null;
+      }
+      
+      try {
+        const deobfuscated = deobfuscateKey(DEFAULT_BIRDEYE_API_KEY_OBFUSCATED);
+        if (deobfuscated && deobfuscated.trim()) {
+          return deobfuscated.trim();
+        }
+      } catch (e) {
+        console.error("Failed to deobfuscate default API key:", e);
+      }
+      
+      return null;
+    }
+
+    // Read obfuscated key from localStorage (if exists)
+    function getStoredBirdeyeApiKey() {
+      try {
+        const stored = localStorage.getItem('birdeye_api_key_obf');
+        if (stored) {
+          return deobfuscateKey(stored);
+        }
+      } catch (e) {
+        console.error('Failed to read stored key:', e);
+      }
+      return null;
+    }
+
+    // Save obfuscated key to localStorage
+    function storeBirdeyeApiKey(key) {
+      try {
+        if (key && key.trim()) {
+          const obfuscated = obfuscateKey(key.trim());
+          localStorage.setItem('birdeye_api_key_obf', obfuscated);
+        } else {
+          localStorage.removeItem('birdeye_api_key_obf');
+        }
+      } catch (e) {
+        console.error('Failed to store key:', e);
+      }
+    }
+
+    function getBirdeyeApiKey() {
+      // Priority 1: Get from input field (user newly entered)
+      const el = document.getElementById("birdeyeApiKey");
+      if (el && el.value && el.value.trim()) {
+        const inputKey = el.value.trim();
+        // Automatically save to localStorage
+        storeBirdeyeApiKey(inputKey);
+        return inputKey;
+      }
+      
+      // Priority 2: Read from localStorage (user previously saved)
+      const storedKey = getStoredBirdeyeApiKey();
+      if (storedKey) {
+        return storedKey;
+      }
+      
+      // 优先级 3: 使用默认的 API Key（混淆后的）- 当输入框为空时自动使用
+      const defaultKey = getDefaultBirdeyeApiKey();
+      if (defaultKey) {
+        console.log("使用默认的 Birdeye API Key（输入框为空）");
+        return defaultKey;
+      }
+      
+      // If all methods fail, return null
+      console.warn("Birdeye API Key not found: input field is empty, localStorage is empty, and no default Key is set");
+      return null;
+    }
+
+    let currentDays = 30; // Currently selected days (controlled by slider), default 30 days
+    let tvlVolumeChartInstance = null;
+    let storedOhlcvData = []; // Store complete 180 days of data [ts, open0, high0, low0, close0, volume, tvl, trades, open1, high1, low1, close1]
+    let currentBaseSymbol = "N/A";
+    let currentQuoteSymbol = "N/A";
+
+    async function fetchOhlcv(poolId, days, token = "base") {
       const limit = days ?? currentDays;
-      const url = `${API_BASE}/networks/solana/pools/${poolId}/ohlcv/day?aggregate=1&limit=${limit}&currency=usd&token=base`;
+      const url = `${API_BASE}/networks/solana/pools/${poolId}/ohlcv/day?aggregate=1&limit=${limit}&currency=usd&token=${token}`;
       const resp = await fetch(url);
       if (!resp.ok) {
         throw new Error(`OHLCV HTTP error ${resp.status} (${resp.statusText})`);
@@ -924,16 +1144,21 @@
     }
 
     async function fetchBirdeyeOhlcv(poolId, days) {
+      const apiKey = getBirdeyeApiKey();
+      if (!apiKey) {
+        throw new Error("Birdeye API Key is required. Please enter your API key in the input field above.");
+      }
+
       const nowSec = Math.floor(Date.now() / 1000);
       const lookbackDays = days ?? currentDays;
-      // 多留 1 天 buffer
+      // Add 1 day buffer
       const fromSec = nowSec - (lookbackDays + 1) * 24 * 60 * 60;
 
       const url = `${BIRDEYE_BASE}/defi/ohlcv/pair?address=${poolId}&type=1D&time_from=${fromSec}&time_to=${nowSec}`;
       const headers = {
         "accept": "application/json",
         "x-chain": "solana",
-        "X-API-KEY": getBirdeyeApiKey()
+        "X-API-KEY": apiKey
       };
 
       const resp = await fetch(url, { headers });
@@ -942,7 +1167,7 @@
       }
       const json = await resp.json();
 
-      // 显示 Birdeye 原始响应（如果对应的容器已存在）
+      // Display Birdeye raw response (if corresponding container exists)
       const birdeyeRawEl = document.getElementById("birdeyeRawJson");
       if (birdeyeRawEl) {
         birdeyeRawEl.textContent = JSON.stringify(json, null, 2);
@@ -964,10 +1189,10 @@
             const low = Number(item[3] ?? open);
             const close = Number(item[4] ?? open);
             const volume = Number(item[5] ?? 0);
-            // 尝试从第 7/8 列读取 TVL（如果有）
+            // Try to read TVL from column 7/8 (if available)
             const tvlCandidate = Number(item[6] ?? item[7] ?? 0);
             const tvl = Number.isFinite(tvlCandidate) && tvlCandidate > 0 ? tvlCandidate : null;
-            // 尝试从后续列读取交易笔数（如果有）
+            // Try to read trade count from subsequent columns (if available)
             const tradesCandidate = Number(item[8] ?? item[9] ?? 0);
             const trades =
               Number.isFinite(tradesCandidate) && tradesCandidate >= 0 ? tradesCandidate : 0;
@@ -979,13 +1204,13 @@
             const low = Number(item.low ?? item.l ?? open);
             const close = Number(item.close ?? item.c ?? open);
             const volume = Number(item.volume ?? item.v ?? 0);
-            // 常见的 TVL 字段名尝试
+            // Try common TVL field names
             const tvlCandidate = Number(
               item.tvl ?? item.tvlUsd ?? item.tvl_usd ??
               item.liquidity ?? item.liquidityUsd ?? item.liquidity_usd ?? 0
             );
             const tvl = Number.isFinite(tvlCandidate) && tvlCandidate > 0 ? tvlCandidate : null;
-            // 常见的交易笔数字段名尝试
+            // Try common trade count field names
             const tradesCandidate = Number(
               item.n ?? item.txCount ?? item.trades ?? item.tradeCount ?? 0
             );
@@ -997,17 +1222,17 @@
         })
         .filter((row) => Array.isArray(row) && row[0]);
 
-      // 根据滑杆对应的天数补齐每天一条（没有数据的天用占位）
+      // Pad one entry per day according to slider days (use placeholder for days without data)
       const daysCount = lookbackDays;
-      const endDay = Math.floor(nowSec / 86400) * 86400; // 当天 00:00
+      const endDay = Math.floor(nowSec / 86400) * 86400; // Today 00:00
       const startDay = endDay - (daysCount - 1) * 86400;
 
-      // 先按“天”归一化键值
+      // First normalize keys by "day"
       const byDay = new Map();
       normalized.forEach((row) => {
         const ts = row[0];
         const dayTs = Math.floor(ts / 86400) * 86400;
-        // 最新的一条覆盖旧的（如果同一天多条）
+        // Latest entry overwrites old (if multiple entries on same day)
         byDay.set(dayTs, row);
       });
 
@@ -1016,7 +1241,7 @@
         if (byDay.has(t)) {
           padded.push(byDay.get(t));
         } else {
-          // 没有数据的天，用占位：价格为 null，成交量 0，TVL null，交易笔数 0
+          // Days without data, use placeholder: price null, volume 0, TVL null, trade count 0
           padded.push([t, null, null, null, null, 0, null, 0]);
         }
       }
@@ -1030,15 +1255,21 @@
 
       const key = getBirdeyeApiKey();
       if (!key) {
-        statusEl.textContent = "Birdeye API Key 为空。";
+        statusEl.textContent = "Birdeye API Key is empty.";
         statusEl.style.color = "var(--danger)";
         return;
       }
 
-      statusEl.textContent = "Checking Birdeye API Key...";
+      // Check if using default key (by checking if input field is empty)
+      const keyInput = document.getElementById("birdeyeApiKey");
+      const isUsingDefaultKey = !keyInput || !keyInput.value || !keyInput.value.trim();
+      
+      statusEl.textContent = isUsingDefaultKey 
+        ? "Checking default Birdeye API Key..." 
+        : "Checking Birdeye API Key...";
       statusEl.style.color = "var(--text-muted)";
 
-      // 使用当前的 poolId（或默认的）测试一下是否能正常获取到数据
+      // Use current poolId (or default) to test if data can be fetched normally
       const poolInput = document.getElementById("poolId");
       const fallbackPoolId = "DJNtGuBGEQiUCWE8F981M2C3ZghZt2XLD8f2sQdZ6rsZ";
       const testPoolId =
@@ -1047,17 +1278,25 @@
       try {
         const list = await fetchBirdeyeOhlcv(testPoolId, 1);
         if (Array.isArray(list) && list.length > 0) {
-          statusEl.textContent = "Birdeye API Key 可用。";
+          const keyInput = document.getElementById("birdeyeApiKey");
+          const isUsingDefaultKey = !keyInput || !keyInput.value || !keyInput.value.trim();
+          statusEl.textContent = isUsingDefaultKey 
+            ? "Default Birdeye API Key is available." 
+            : "Birdeye API Key is available.";
           statusEl.style.color = "var(--accent)";
         } else {
           statusEl.textContent =
-            "Birdeye API Key 请求成功但没有返回数据，可能是权限或测试池子的问题。";
+            "Birdeye API Key request succeeded but returned no data, may be a permission or test pool issue.";
           statusEl.style.color = "var(--text-muted)";
         }
       } catch (e) {
         console.error("Birdeye key check failed", e);
         const msg = e && e.message ? e.message : String(e);
-        statusEl.textContent = `Birdeye API Key 不可用：${msg}`;
+        const keyInput = document.getElementById("birdeyeApiKey");
+        const isUsingDefaultKey = !keyInput || !keyInput.value || !keyInput.value.trim();
+        statusEl.textContent = isUsingDefaultKey
+          ? `Default Birdeye API Key is unavailable: ${msg}. Please use your own API Key.`
+          : `Birdeye API Key is unavailable: ${msg}`;
         statusEl.style.color = "var(--danger)";
       }
     }
@@ -1068,13 +1307,15 @@
       tvlData,
       volData,
       hasTvl,
-      _openData = [],      // 已不再使用 open/close，仅保留 high/low
-      highData = [],
-      lowData = [],
+      _openData = [],      // No longer using open/close, only keeping high/low
+      highData0 = [],
+      lowData0 = [],
       _closeData = [],
-      hasPrice = false,
-      tradesData = [],
-      hasTrades = false
+      hasPrice0 = false,
+      highData1 = [],
+      lowData1 = [],
+      hasPrice1 = false,
+      hiddenStates = {}    // Save dataset hidden state
     ) {
       if (tvlVolumeChartInstance) {
         tvlVolumeChartInstance.destroy();
@@ -1097,12 +1338,12 @@
         });
       }
 
-      if (hasPrice) {
+      if (hasPrice0) {
         datasets.push(
           {
             type: "line",
-            label: "High",
-            data: highData,
+            label: `${currentBaseSymbol} High`,
+            data: highData0,
             borderColor: "rgba(250, 204, 21, 0.9)",
             backgroundColor: "rgba(250, 204, 21, 0.12)",
             borderWidth: 1.5,
@@ -1113,8 +1354,8 @@
           },
           {
             type: "line",
-            label: "Low",
-            data: lowData,
+            label: `${currentBaseSymbol} Low`,
+            data: lowData0,
             borderColor: "rgba(248, 113, 113, 0.9)",
             backgroundColor: "rgba(248, 113, 113, 0.12)",
             borderWidth: 1.5,
@@ -1126,19 +1367,33 @@
         );
       }
 
-      if (hasTrades) {
-        datasets.push({
-          type: "line",
-          label: "Trades Count",
-          data: tradesData,
-          borderColor: "rgba(244, 114, 182, 0.9)", // pink
-          backgroundColor: "rgba(244, 114, 182, 0.15)",
-          borderWidth: 1.8,
-          tension: 0.3,
-          yAxisID: "y1",
-          pointRadius: 0,
-          pointHoverRadius: 3
-        });
+      if (hasPrice1) {
+        datasets.push(
+          {
+            type: "line",
+            label: `${currentQuoteSymbol} High`,
+            data: highData1,
+            borderColor: "rgba(59, 130, 246, 0.9)",  // blue
+            backgroundColor: "rgba(59, 130, 246, 0.12)",
+            borderWidth: 1.5,
+            tension: 0.25,
+            yAxisID: "y",
+            pointRadius: 0,
+            pointHoverRadius: 2.5
+          },
+          {
+            type: "line",
+            label: `${currentQuoteSymbol} Low`,
+            data: lowData1,
+            borderColor: "rgba(139, 92, 246, 0.9)",  // purple
+            backgroundColor: "rgba(139, 92, 246, 0.12)",
+            borderWidth: 1.5,
+            tension: 0.25,
+            yAxisID: "y",
+            pointRadius: 0,
+            pointHoverRadius: 2.5
+          }
+        );
       }
 
       datasets.push({
@@ -1252,22 +1507,174 @@
         }
       });
 
-      // 控制图例中 TVL 是否显示
+      // Restore dataset hidden state
+      if (tvlVolumeChartInstance && tvlVolumeChartInstance.data && tvlVolumeChartInstance.data.datasets) {
+        tvlVolumeChartInstance.data.datasets.forEach((dataset) => {
+          if (dataset.label && hiddenStates.hasOwnProperty(dataset.label)) {
+            dataset.hidden = hiddenStates[dataset.label];
+          }
+        });
+        // 如果有任何数据集被隐藏，更新图表
+        const hasHidden = tvlVolumeChartInstance.data.datasets.some(d => d.hidden);
+        if (hasHidden) {
+          tvlVolumeChartInstance.update('none'); // 'none' 模式避免动画
+        }
+      }
+
+      // Control whether TVL is displayed in legend
       const tvlLegendEl = document.getElementById("tvlLegend");
       if (tvlLegendEl) {
         tvlLegendEl.style.display = hasTvl ? "inline-flex" : "none";
+        if (hasTvl) {
+          // Find TVL dataset index
+          const tvlDatasetIndex = datasets.findIndex(d => d.label === "TVL (USD)");
+          if (tvlDatasetIndex !== -1) {
+            tvlLegendEl.setAttribute("data-dataset-index", tvlDatasetIndex);
+            tvlLegendEl.style.cursor = "pointer";
+            tvlLegendEl.classList.remove("legend-hidden");
+          }
+        }
       }
+
+      // Update token0 price legend
+      const token0HighLegendEl = document.getElementById("token0HighLegend");
+      const token0LowLegendEl = document.getElementById("token0LowLegend");
+      const token0HighLabelEl = document.getElementById("token0HighLabel");
+      const token0LowLabelEl = document.getElementById("token0LowLabel");
+      if (token0HighLegendEl) {
+        token0HighLegendEl.style.display = hasPrice0 ? "inline-flex" : "none";
+        if (hasPrice0) {
+          const highDatasetIndex = datasets.findIndex(d => d.label === `${currentBaseSymbol} High`);
+          if (highDatasetIndex !== -1) {
+            token0HighLegendEl.setAttribute("data-dataset-index", highDatasetIndex);
+            token0HighLegendEl.style.cursor = "pointer";
+            token0HighLegendEl.classList.remove("legend-hidden");
+          }
+        }
+      }
+      if (token0LowLegendEl) {
+        token0LowLegendEl.style.display = hasPrice0 ? "inline-flex" : "none";
+        if (hasPrice0) {
+          const lowDatasetIndex = datasets.findIndex(d => d.label === `${currentBaseSymbol} Low`);
+          if (lowDatasetIndex !== -1) {
+            token0LowLegendEl.setAttribute("data-dataset-index", lowDatasetIndex);
+            token0LowLegendEl.style.cursor = "pointer";
+            token0LowLegendEl.classList.remove("legend-hidden");
+          }
+        }
+      }
+      if (token0HighLabelEl && hasPrice0) {
+        token0HighLabelEl.textContent = `${currentBaseSymbol} High`;
+      }
+      if (token0LowLabelEl && hasPrice0) {
+        token0LowLabelEl.textContent = `${currentBaseSymbol} Low`;
+      }
+
+      // Update token1 price legend
+      const token1HighLegendEl = document.getElementById("token1HighLegend");
+      const token1LowLegendEl = document.getElementById("token1LowLegend");
+      const token1HighLabelEl = document.getElementById("token1HighLabel");
+      const token1LowLabelEl = document.getElementById("token1LowLabel");
+      if (token1HighLegendEl) {
+        token1HighLegendEl.style.display = hasPrice1 ? "inline-flex" : "none";
+        if (hasPrice1) {
+          const highDatasetIndex = datasets.findIndex(d => d.label === `${currentQuoteSymbol} High`);
+          if (highDatasetIndex !== -1) {
+            token1HighLegendEl.setAttribute("data-dataset-index", highDatasetIndex);
+            token1HighLegendEl.style.cursor = "pointer";
+            token1HighLegendEl.classList.remove("legend-hidden");
+          }
+        }
+      }
+      if (token1LowLegendEl) {
+        token1LowLegendEl.style.display = hasPrice1 ? "inline-flex" : "none";
+        if (hasPrice1) {
+          const lowDatasetIndex = datasets.findIndex(d => d.label === `${currentQuoteSymbol} Low`);
+          if (lowDatasetIndex !== -1) {
+            token1LowLegendEl.setAttribute("data-dataset-index", lowDatasetIndex);
+            token1LowLegendEl.style.cursor = "pointer";
+            token1LowLegendEl.classList.remove("legend-hidden");
+          }
+        }
+      }
+      if (token1HighLabelEl && hasPrice1) {
+        token1HighLabelEl.textContent = `${currentQuoteSymbol} High`;
+      }
+      if (token1LowLabelEl && hasPrice1) {
+        token1LowLabelEl.textContent = `${currentQuoteSymbol} Low`;
+      }
+
+      // Add click functionality to Volume legend
+      const volumeLegendEl = document.getElementById("volumeLegend");
+      if (volumeLegendEl) {
+        const volumeDatasetIndex = datasets.findIndex(d => d.label === "Volume (USD)");
+        if (volumeDatasetIndex !== -1) {
+          volumeLegendEl.setAttribute("data-dataset-index", volumeDatasetIndex);
+          volumeLegendEl.style.cursor = "pointer";
+          volumeLegendEl.classList.remove("legend-hidden");
+        }
+      }
+
+      // Restore legend visual style (based on dataset hidden state)
+      if (tvlVolumeChartInstance && tvlVolumeChartInstance.data && tvlVolumeChartInstance.data.datasets) {
+        tvlVolumeChartInstance.data.datasets.forEach((dataset, index) => {
+          const legendItem = document.querySelector(`.chart-legend-item[data-dataset-index="${index}"]`);
+          if (legendItem) {
+            if (dataset.hidden) {
+              legendItem.classList.add('legend-hidden');
+            } else {
+              legendItem.classList.remove('legend-hidden');
+            }
+          }
+        });
+      }
+
+      // Setup legend click events
+      setupLegendClickHandlers();
+    }
+
+    function setupLegendClickHandlers() {
+      // Remove all old event listeners
+      const legendItems = document.querySelectorAll('.chart-legend-item[data-dataset-index]');
+      legendItems.forEach(item => {
+        // Use cloneNode to remove old event listeners
+        const newItem = item.cloneNode(true);
+        if (item.parentNode) {
+          item.parentNode.replaceChild(newItem, item);
+        }
+        
+        // Add new click event listener
+        newItem.addEventListener('click', function(e) {
+          e.stopPropagation();
+          const datasetIndex = parseInt(this.getAttribute('data-dataset-index'));
+          if (tvlVolumeChartInstance && !isNaN(datasetIndex) && datasetIndex >= 0 && datasetIndex < tvlVolumeChartInstance.data.datasets.length) {
+            const dataset = tvlVolumeChartInstance.data.datasets[datasetIndex];
+            const isHidden = dataset.hidden || false;
+            
+            // Toggle hidden state
+            dataset.hidden = !isHidden;
+            tvlVolumeChartInstance.update();
+            
+            // Update legend visual style
+            if (dataset.hidden) {
+              this.classList.add('legend-hidden');
+            } else {
+              this.classList.remove('legend-hidden');
+            }
+          }
+        });
+      });
     }
 
     function updateChartFromStoredData(days) {
       if (!storedOhlcvData || storedOhlcvData.length === 0) {
-        // 如果没有存储的数据，清空图表
+        // If no stored data, clear chart
         const ctx = document.getElementById("tvlVolumeChart").getContext("2d");
-        buildTvlVolumeChart(ctx, [], [], [], false, [], [], [], [], false, [], false);
+        buildTvlVolumeChart(ctx, [], [], [], false, [], [], [], [], false, [], [], false, {});
         return;
       }
 
-      // 从存储的数据中取最后 N 天的数据
+      // Get last N days of data from stored data
       const displayDays = days || currentDays;
       const startIndex = Math.max(0, storedOhlcvData.length - displayDays);
       const displayData = storedOhlcvData.slice(startIndex);
@@ -1275,22 +1682,29 @@
       const labels = [];
       const tvlData = [];
       const volData = [];
-      const highData = [];
-      const lowData = [];
-      const tradesData = [];
+      const highData0 = [];  // token0 high
+      const lowData0 = [];   // token0 low
+      const highData1 = [];  // token1 high
+      const lowData1 = [];   // token1 low
       let hasTvl = false;
-      let hasPrice = false;
-      let hasTrades = false;
+      let hasPrice0 = false;
+      let hasPrice1 = false;
 
       displayData.forEach(entry => {
+        // 数据格式: [ts, open0, high0, low0, close0, volume, tvl, trades, open1, high1, low1, close1]
         const ts = entry[0];       // timestamp in seconds
-        const _open = entry[1]; // 不再单独绘制 open/close，仅用于判断是否有价格
-        const high = entry[2];
-        const low = entry[3];
-        const _close = entry[4];
+        const _open0 = entry[1];  // token0 open
+        const high0 = entry[2];   // token0 high
+        const low0 = entry[3];    // token0 low
+        const _close0 = entry[4]; // token0 close
         const volume = entry[5];   // volume in USD (with currency=usd)
-        const tvl = entry[6];      // 尝试从第 7 项读取 TVL（如果有）
-        const trades = entry[7];   // 每日交易笔数（如果有）
+        const tvl = entry[6];      // TVL (if available)
+        const trades = entry[7];   // Daily trade count (if available)
+        const _open1 = entry[8];  // token1 open
+        const high1 = entry[9];   // token1 high
+        const low1 = entry[10];   // token1 low
+        const _close1 = entry[11]; // token1 close
+        
         const date = new Date(ts * 1000);
         const label = date.toLocaleDateString("en-US", {
           month: "short",
@@ -1299,19 +1713,34 @@
 
         labels.push(label);
 
-        // 高低价
-        if (high != null && !isNaN(Number(high))) {
-          highData.push(Number(high));
-          hasPrice = true;
+        // token0 high/low price
+        if (high0 != null && !isNaN(Number(high0))) {
+          highData0.push(Number(high0));
+          hasPrice0 = true;
         } else {
-          highData.push(null);
+          highData0.push(null);
         }
 
-        if (low != null && !isNaN(Number(low))) {
-          lowData.push(Number(low));
-          hasPrice = true;
+        if (low0 != null && !isNaN(Number(low0))) {
+          lowData0.push(Number(low0));
+          hasPrice0 = true;
         } else {
-          lowData.push(null);
+          lowData0.push(null);
+        }
+
+        // token1 high/low price
+        if (high1 != null && !isNaN(Number(high1))) {
+          highData1.push(Number(high1));
+          hasPrice1 = true;
+        } else {
+          highData1.push(null);
+        }
+
+        if (low1 != null && !isNaN(Number(low1))) {
+          lowData1.push(Number(low1));
+          hasPrice1 = true;
+        } else {
+          lowData1.push(null);
         }
 
         // TVL
@@ -1322,19 +1751,18 @@
           tvlData.push(null);
         }
 
-        // 交易笔数（Count）
-        if (trades != null && !isNaN(Number(trades))) {
-          const n = Number(trades);
-          tradesData.push(n);
-          if (n > 0) {
-            hasTrades = true;
-          }
-        } else {
-          tradesData.push(0);
-        }
-
         volData.push(volume);
       });
+
+      // Save current dataset hidden state (if chart exists)
+      const hiddenStates = {};
+      if (tvlVolumeChartInstance && tvlVolumeChartInstance.data && tvlVolumeChartInstance.data.datasets) {
+        tvlVolumeChartInstance.data.datasets.forEach((dataset, index) => {
+          if (dataset.label) {
+            hiddenStates[dataset.label] = dataset.hidden || false;
+          }
+        });
+      }
 
       const ctx = document.getElementById("tvlVolumeChart").getContext("2d");
       buildTvlVolumeChart(
@@ -1343,13 +1771,15 @@
         tvlData,
         volData,
         hasTvl,
-        [],        // openData 不再使用
-        highData,
-        lowData,
-        [],        // closeData 不再使用
-        hasPrice,
-        tradesData,
-        hasTrades
+        [],        // openData no longer used
+        highData0,
+        lowData0,
+        [],        // closeData no longer used
+        hasPrice0,
+        highData1,
+        lowData1,
+        hasPrice1,
+        hiddenStates  // Pass hidden state
       );
     }
 
@@ -1392,7 +1822,7 @@
 
         const attr = data.attributes;
 
-        // 获取代币名称，尝试多个可能的字段
+        // Get token name, try multiple possible fields
         let baseSymbol = attr.base_token_symbol || 
                         attr.base_token?.symbol ||
                         attr.base?.symbol ||
@@ -1409,11 +1839,11 @@
                          (data.relationships?.quote_token?.data?.symbol) ||
                          "N/A";
         
-        // 如果还是 N/A，尝试从 included 数组中查找（GeckoTerminal API 通常包含这个）
+        // If still N/A, try to find from included array (GeckoTerminal API usually includes this)
         if ((baseSymbol === "N/A" || quoteSymbol === "N/A") && json.included && Array.isArray(json.included)) {
           const tokens = json.included.filter(item => item.type === 'token' && item.attributes?.symbol);
           
-          // 尝试通过 relationships 找到对应的 token
+          // Try to find corresponding token through relationships
           if (data.relationships) {
             const baseTokenId = data.relationships?.base_token?.data?.id || 
                                data.relationships?.base_token?.data?.data?.id;
@@ -1699,23 +2129,95 @@
           daysRangeEl.value = days;
         }
 
+        // 保存 token 符号供图例使用
+        currentBaseSymbol = baseSymbol;
+        currentQuoteSymbol = quoteSymbol;
+
         // 2, fetch ohlcv - 总是获取180天的数据并存储
-        loadingEl.textContent = "Loading 180 days of OHLCV data...";
-        let ohlcvList = [];
+        loadingEl.textContent = "Loading 180 days of OHLCV data for both tokens...";
+        let ohlcvList0 = [];
+        let ohlcvList1 = [];
+        
+        // 尝试从 Birdeye 获取（如果可用）
         try {
-          ohlcvList = await fetchBirdeyeOhlcv(cleanId, 180);
+          const birdeyeData = await fetchBirdeyeOhlcv(cleanId, 180);
+          // Birdeye 返回的是 base token 的价格，我们需要同时获取 quote token
+          ohlcvList0 = birdeyeData;
+          // 尝试从 GeckoTerminal 获取 quote token 的价格
+          try {
+            ohlcvList1 = await fetchOhlcv(cleanId, 180, "quote");
+          } catch (e1) {
+            console.warn("Failed to load quote token OHLCV from GeckoTerminal", e1);
+          }
         } catch (e) {
           console.error("Failed to load OHLCV from Birdeye, falling back to GeckoTerminal", e);
           try {
-            ohlcvList = await fetchOhlcv(cleanId, 180);
+            // 从 GeckoTerminal 同时获取 base 和 quote token 的数据
+            const [baseData, quoteData] = await Promise.all([
+              fetchOhlcv(cleanId, 180, "base"),
+              fetchOhlcv(cleanId, 180, "quote")
+            ]);
+            ohlcvList0 = baseData;
+            ohlcvList1 = quoteData;
           } catch (inner) {
             console.error("Failed to load OHLCV from GeckoTerminal as well", inner);
           }
         }
 
+        // 合并 token0 和 token1 的数据
+        // 数据格式: [ts, open0, high0, low0, close0, volume, tvl, trades, open1, high1, low1, close1]
+        const mergedData = [];
+        const dataMap0 = new Map();
+        const dataMap1 = new Map();
+        
+        // 建立 token0 数据的时间戳映射
+        ohlcvList0.forEach(item => {
+          if (Array.isArray(item) && item.length >= 5) {
+            const ts = item[0];
+            const dayTs = Math.floor(ts / 86400) * 86400;
+            dataMap0.set(dayTs, item);
+          }
+        });
+        
+        // 建立 token1 数据的时间戳映射
+        ohlcvList1.forEach(item => {
+          if (Array.isArray(item) && item.length >= 5) {
+            const ts = item[0];
+            const dayTs = Math.floor(ts / 86400) * 86400;
+            dataMap1.set(dayTs, item);
+          }
+        });
+        
+        // 合并所有时间戳
+        const allTimestamps = new Set([...dataMap0.keys(), ...dataMap1.keys()]);
+        const sortedTimestamps = Array.from(allTimestamps).sort((a, b) => a - b);
+        
+        sortedTimestamps.forEach(dayTs => {
+          const item0 = dataMap0.get(dayTs);
+          const item1 = dataMap1.get(dayTs);
+          
+          // token0 数据: [ts, open, high, low, close, volume, tvl?, trades?]
+          const ts = item0 ? item0[0] : (item1 ? item1[0] : dayTs);
+          const open0 = item0 ? (item0[1] ?? null) : null;
+          const high0 = item0 ? (item0[2] ?? null) : null;
+          const low0 = item0 ? (item0[3] ?? null) : null;
+          const close0 = item0 ? (item0[4] ?? null) : null;
+          const volume = item0 ? (item0[5] ?? 0) : (item1 ? (item1[5] ?? 0) : 0);
+          const tvl = item0 ? (item0[6] ?? null) : null;
+          const trades = item0 ? (item0[7] ?? 0) : 0;
+          
+          // token1 数据
+          const open1 = item1 ? (item1[1] ?? null) : null;
+          const high1 = item1 ? (item1[2] ?? null) : null;
+          const low1 = item1 ? (item1[3] ?? null) : null;
+          const close1 = item1 ? (item1[4] ?? null) : null;
+          
+          mergedData.push([ts, open0, high0, low0, close0, volume, tvl, trades, open1, high1, low1, close1]);
+        });
+
         // 存储完整的180天数据
-        storedOhlcvData = ohlcvList.length > 0 
-          ? [...ohlcvList].sort((a, b) => a[0] - b[0]) 
+        storedOhlcvData = mergedData.length > 0 
+          ? [...mergedData].sort((a, b) => a[0] - b[0]) 
           : [];
 
         // 计算最近7天的总成交量
@@ -1847,6 +2349,60 @@
       });
     }
 
+    // 折叠/展开自定义 API Key 输入区域
+    const toggleCustomKeyBtn = document.getElementById("toggleCustomKeyBtn");
+    const customKeySection = document.getElementById("customKeySection");
+    const toggleCustomKeyText = document.getElementById("toggleCustomKeyText");
+    const toggleCustomKeyArrow = document.getElementById("toggleCustomKeyArrow");
+    
+    if (toggleCustomKeyBtn && customKeySection) {
+      toggleCustomKeyBtn.addEventListener("click", () => {
+        const isExpanded = customKeySection.style.display !== "none";
+        if (isExpanded) {
+          // 折叠
+          customKeySection.style.display = "none";
+          toggleCustomKeyText.textContent = "api_key_config";
+          toggleCustomKeyArrow.textContent = "▼";
+        } else {
+          // 展开
+          customKeySection.style.display = "block";
+          toggleCustomKeyText.textContent = "api_key_config";
+          toggleCustomKeyArrow.textContent = "▲";
+        }
+      });
+    }
+
+    // 显示/隐藏 API Key 按钮
+    const toggleKeyVisibilityBtn = document.getElementById("toggleKeyVisibilityBtn");
+    if (toggleKeyVisibilityBtn) {
+      toggleKeyVisibilityBtn.addEventListener("click", () => {
+        const keyInput = document.getElementById("birdeyeApiKey");
+        if (keyInput) {
+          if (keyInput.type === "password") {
+            keyInput.type = "text";
+            toggleKeyVisibilityBtn.textContent = "🙈";
+          } else {
+            keyInput.type = "password";
+            toggleKeyVisibilityBtn.textContent = "👁️";
+          }
+        }
+      });
+    }
+
+    // 页面加载时尝试恢复存储的 key（但不显示在输入框中，保持隐私）
+    function restoreStoredKey() {
+      const storedKey = getStoredBirdeyeApiKey();
+      if (storedKey) {
+        const keyInput = document.getElementById("birdeyeApiKey");
+        if (keyInput && !keyInput.value) {
+          // 静默恢复，不显示在输入框中
+          // 如果需要自动填充，取消下面的注释：
+          // keyInput.value = storedKey;
+          console.log("已从本地存储恢复 API Key（已混淆）");
+        }
+      }
+    }
+
     // 滑杆：实时更新天数，只更新图表显示，不重新加载数据
     const daysRangeEl = document.getElementById("daysRange");
     if (daysRangeEl) {
@@ -1870,10 +2426,66 @@
       daysRangeEl.addEventListener("change", updateChartFromSlider);
     }
 
+    // Popular pools data
+    const popularPools = [
+      { name: "cbBTC/USDC", id: "7ENJsaWAy4PRs24NYd1WqUdY3DWi43rHvyZXhCjEiNWE" },
+      { name: "SOL/USDT", id: "22HUWiJaTNph96KQTKZVy2wg8KzfCems5nyW7E5H5J6w" },
+      { name: "SOL/USDC", id: "DJNtGuBGEQiUCWE8F981M2C3ZghZt2XLD8f2sQdZ6rsZ" },
+      { name: "USDC/USDT", id: "46Z4iBRb8Kwj2qBoDyLAWt99vKXsUS1vE7vFU2vy5x2V" },
+      { name: "SOL/HYPE", id: "4nDy9TQUTfqbmexZi25ujv11KMkDfFMmGeKPRw8HryWY" },
+      { name: "SOL/WBTC", id: "GLfJcQZgtLV2QyEBxmNNZ75uJFG1VRiLiki8PfcTZQjW" },
+      { name: "USD1/USDC", id: "CWNajRMzUb7ywfuVu9N7b9myhm6GPGFVNaMNAPkNpSjn" },
+      { name: "CAKE/USDC", id: "J734vwZxCrrFLhGxwkZdFo3537snbYtLbkvtM15HkETr" },
+    ];
+
+    // Initialize popular pools scroll bar
+    function initPopularPools() {
+      const scrollContainer = document.getElementById("popularPoolsScroll");
+      if (!scrollContainer) return;
+
+      // Create pool items (duplicate for seamless loop)
+      const createPoolItems = () => {
+        return popularPools.map(pool => {
+          const item = document.createElement("div");
+          item.className = "popular-pool-item";
+          item.textContent = pool.name;
+          item.dataset.poolId = pool.id;
+          item.addEventListener("click", () => {
+            const poolIdInput = document.getElementById("poolId");
+            if (poolIdInput) {
+              poolIdInput.value = pool.id;
+              // Automatically trigger Load Pool button
+              const loadBtn = document.getElementById("loadBtn");
+              if (loadBtn) {
+                loadBtn.click();
+              } else {
+                // Fallback: directly call loadPool if button not found
+                loadPool(pool.id, currentDays);
+              }
+            }
+          });
+          return item;
+        });
+      };
+
+      // Duplicate items for seamless scrolling
+      const items = createPoolItems();
+      const duplicatedItems = createPoolItems();
+      
+      items.forEach(item => scrollContainer.appendChild(item));
+      duplicatedItems.forEach(item => scrollContainer.appendChild(item));
+    }
+
     window.addEventListener("load", () => {
+      // Initialize popular pools
+      initPopularPools();
+      
+      // 尝试恢复存储的 API Key
+      restoreStoredKey();
+      
       const poolId = document.getElementById("poolId").value;
       loadPool(poolId, currentDays);
-      // 初次加载时也检查一下默认的 Birdeye API Key 是否可用
+      // 如果用户已输入 Birdeye API Key，则检查其是否可用
       checkBirdeyeKey();
     });
 
