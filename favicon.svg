@@ -1,0 +1,19 @@
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" style="background: transparent;">
+
+  <!-- 上横条 -->
+  <rect x="32" y="38" width="192" height="16" rx="4" fill="#49e55e"/>
+
+  <!-- 中间折线：/\/ -->
+  <polyline 
+    points="32,150 110,95 170,155 224,110"
+    fill="none"
+    stroke="#57ff8a"
+    stroke-width="14"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+
+  <!-- 下横条 -->
+  <rect x="32" y="202" width="192" height="16" rx="4" fill="#16b981"/>
+
+</svg>

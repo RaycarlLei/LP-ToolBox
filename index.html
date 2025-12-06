@@ -2,6 +2,7 @@
 <html id="htmlLang" lang="en">
 <head>
   <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <title>Is a Liquidity Pool Worth Investing In? - Solana 流动性池追踪工具</title>
   <!-- Chart.js for charts -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -273,6 +274,54 @@
     }
 
     .run-simulation-btn:active {
+      transform: translateY(0) !important;
+      box-shadow: 
+        0 4px 16px rgba(34, 197, 94, 0.25),
+        0 0 0 1px rgba(34, 197, 94, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+    }
+
+    #loadBtn {
+      padding: 10px 18px !important;
+      font-size: 13px !important;
+      font-weight: 600 !important;
+      background: linear-gradient(135deg, rgba(34, 197, 94, 0.25), rgba(16, 185, 129, 0.2)) !important;
+      border: 2px solid rgba(34, 197, 94, 0.5) !important;
+      box-shadow: 
+        0 6px 20px rgba(34, 197, 94, 0.3),
+        0 0 0 1px rgba(34, 197, 94, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+      gap: 6px !important;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #loadBtn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+      transition: left 0.5s ease;
+    }
+
+    #loadBtn:hover::before {
+      left: 100%;
+    }
+
+    #loadBtn:hover {
+      background: linear-gradient(135deg, rgba(34, 197, 94, 0.35), rgba(16, 185, 129, 0.3)) !important;
+      border-color: rgba(34, 197, 94, 0.7) !important;
+      transform: translateY(-2px) !important;
+      box-shadow: 
+        0 8px 28px rgba(34, 197, 94, 0.4),
+        0 0 0 1px rgba(34, 197, 94, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
+    }
+
+    #loadBtn:active {
       transform: translateY(0) !important;
       box-shadow: 
         0 4px 16px rgba(34, 197, 94, 0.25),
@@ -776,7 +825,7 @@
           placeholder="DJNtGuBGEQiUCWE8F981M2C3ZghZt2XLD8f2sQdZ6rsZ"
         />
         <button id="loadBtn">
-          <span class="button-icon"></span>
+          <img src="favicon.svg" style="width: 14px; height: 14px;" alt="" />
           <span id="loadBtnText">Load Pool</span>
         </button>
       </div>
@@ -909,9 +958,9 @@
       <div class="card-header">
         <div>
           <div class="card-title" id="ilSimulatorTitle">Impermanent Loss Simulator</div>
-          <div class="muted-label" id="ilSimulatorSubtitle">PancakeSwap V3 · SOL / USDC · Monte Carlo</div>
+          <div class="muted-label" id="ilSimulatorSubtitle">Monte Carlo</div>
         </div>
-        <span class="badge">IL · Distribution · CI</span>
+        <span class="badge">Based on GBM model</span>
       </div>
 
       <p class="small" id="ilSimulatorDesc" style="margin-bottom: 10px;">
@@ -1180,10 +1229,8 @@
       <div class="chart-container" style="margin-top: 18px;">
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <div class="muted-label" id="monteCarloPathLabel">蒙特卡洛模拟路径</div>
-          <button id="monteCarloAxisToggle" style="background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 4px; padding: 4px 8px; cursor: pointer; color: rgba(148, 163, 184, 0.9); font-size: 11px; display: flex; align-items: center; gap: 4px;" title="点击Y轴或此按钮切换价格/百分比">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 2v20M2 12h20"></path>
-            </svg>
+          <button id="monteCarloAxisToggle" class="clickable-stat" style="background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 4px; padding: 4px 8px; color: rgba(148, 163, 184, 0.9); font-size: 11px; display: flex; align-items: center; gap: 4px;" title="点击Y轴或此按钮切换价格/百分比">
+            <span class="swap-icon">⇄</span>
             <span id="monteCarloAxisToggleText">价格</span>
           </button>
         </div>
@@ -1219,7 +1266,7 @@
         tagline: "Live Pool Metrics and Impermanent Loss Calculator",
         // Pool ID section
         poolId: "Pool ID",
-        geckoTerminalBadge: "GeckoTerminal Pool Address",
+        geckoTerminalBadge: "Popular Liquidity Pools",
         poolIdLabel: "Paste any Solana pool address to inspect its stats.",
         loadPool: "Load Pool",
         apiKeyConfig: "api_key_config",
@@ -1244,7 +1291,7 @@
         lowPrice: "Low Price",
         // IL Simulator
         ilSimulator: "Impermanent Loss Simulator",
-        ilSimulatorSubtitle: "PancakeSwap V3 · SOL / USDC · Monte Carlo",
+        ilSimulatorSubtitle: "Monte Carlo",
         ilSimulatorDesc: "Enter the concentrated liquidity range, current price, daily volatility, and time period. Use geometric Brownian motion to perform Monte Carlo simulation on future prices, estimating expected IL, distribution, and confidence intervals.",
         priceLowerBound: "Price lower bound",
         priceLowerBoundPlaceholder: "e.g. 100",
@@ -1269,8 +1316,8 @@
         ilDistribution: "IL distribution (percent)",
         ilDistributionDesc: "Based on IL samples obtained from Monte Carlo simulation, bin the results and plot as a frequency histogram.",
         frequencyOfSimulatedIL: "Frequency of simulated IL",
-        monteCarloPath: "Monte Carlo Simulation Path",
-        monteCarloPathDesc: "Shows the price evolution of the Monte Carlo simulation paths, based on current price, daily volatility, and simulation days.",
+        monteCarloPath: "Future Price Simulation",
+        monteCarloPathDesc: "Assuming prices follow a random walk based on daily volatility, the chart shows multiple simulated future price change curves, with each curve representing one possible price trajectory.",
         pricePath: "Price Path",
         lpRange: "LP Range",
         dayLabel: "Day {day}",
@@ -1348,7 +1395,7 @@
         lowPrice: "最低价",
         // IL Simulator
         ilSimulator: "无常损失模拟器",
-        ilSimulatorSubtitle: "PancakeSwap V3 · SOL / USDC · 蒙特卡洛",
+        ilSimulatorSubtitle: "蒙特卡洛",
         ilSimulatorDesc: "输入集中流动性范围、当前价格、每日波动率和时间段。使用GBM（几何布朗运动）对未来价格进行蒙特卡洛模拟，估算预期 IL、分布和置信区间。",
         priceLowerBound: "LP range 价格下限",
         priceLowerBoundPlaceholder: "例如：100",
@@ -1373,8 +1420,8 @@
         ilDistribution: "IL 分布 (百分比)",
         ilDistributionDesc: "基于从蒙特卡洛模拟获得的 IL 样本，将结果绘制为频率直方图。",
         frequencyOfSimulatedIL: "模拟得到的 IL 分布频率",
-        monteCarloPath: "蒙特卡洛模拟路径",
-        monteCarloPathDesc: "展示第一次模拟的价格变化过程，包括当前价格、每日波动率和模拟天数。",
+        monteCarloPath: "未来价格模拟",
+        monteCarloPathDesc: "假设价格按每日波动率随机游走，图中是模拟多次未来价格变化的曲线，每条曲线代表一次可能的价格走势。",
         pricePath: "价格路径",
         lpRange: "LP Range",
         dayLabel: "第 {day} 天",
