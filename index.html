@@ -4685,6 +4685,59 @@
     }
 
     /**
+     * Calculate the covariance between trading volume and price returns (which drive IL).
+     * Returns the covariance value, or null if insufficient data.
+     */
+    function calculateVolumePriceCorrelation() {
+      if (!storedOhlcvData || storedOhlcvData.length < 2) {
+        return null;
+      }
+
+      // Extract volume and price data
+      // Data format: [ts, open0, high0, low0, close0, volume, tvl, trades, open1, high1, low1, close1]
+      const volumes = [];
+      const priceReturns = [];
+      
+      for (let i = 1; i < storedOhlcvData.length; i++) {
+        const prevEntry = storedOhlcvData[i - 1];
+        const currEntry = storedOhlcvData[i];
+        
+        const prevClose0 = prevEntry[4];  // token0 close price
+        const currClose0 = currEntry[4];  // token0 close price
+        const volume = currEntry[5];       // volume in USD
+        
+        if (prevClose0 != null && currClose0 != null && volume != null &&
+            !isNaN(Number(prevClose0)) && !isNaN(Number(currClose0)) && !isNaN(Number(volume)) &&
+            Number(prevClose0) > 0 && Number(currClose0) > 0 && Number(volume) >= 0) {
+          // Calculate log return
+          const logReturn = Math.log(Number(currClose0) / Number(prevClose0));
+          volumes.push(Number(volume));
+          priceReturns.push(logReturn);
+        }
+      }
+
+      if (volumes.length < 2 || priceReturns.length < 2) {
+        return null; // Need at least 2 data points
+      }
+
+      // Calculate means
+      const meanVolume = volumes.reduce((a, b) => a + b, 0) / volumes.length;
+      const meanReturn = priceReturns.reduce((a, b) => a + b, 0) / priceReturns.length;
+
+      // Calculate covariance
+      let covariance = 0;
+      for (let i = 0; i < volumes.length; i++) {
+        covariance += (volumes[i] - meanVolume) * (priceReturns[i] - meanReturn);
+      }
+      
+      // Use sample covariance (n-1)
+      const n = volumes.length;
+      covariance = covariance / (n - 1);
+
+      return covariance;
+    }
+
+    /**
      * Calculate and display correlation only.
      * Other risk metrics are now calculated in the Monte Carlo simulation.
      */
@@ -4971,6 +5024,15 @@
       ciEl.textContent = `${toPercent(il5)}  ~  ${toPercent(il95)}`;
       stdEl.textContent = toPercent(ilStd);
       
+      // Equivalent IL APR: Convert expected IL to annualized percentage
+      // Formula: (meanIl / days) * 365, then toPercent converts to percentage
+      if (aprEl && days > 0 && Number.isFinite(meanIl)) {
+        const equivalentILApr = (meanIl / days) * 365;
+        aprEl.textContent = toPercent(equivalentILApr);
+      } else if (aprEl) {
+        aprEl.textContent = "–";
+      }
+      
       // 1.5. Time In Range Ratio
       if (inRangeDays && inRangeDays.length > 0 && n > 0) {
         const validRatios = inRangeDays.filter(r => Number.isFinite(r) && r !== null && r !== undefined);
@@ -5103,6 +5165,9 @@
       }
 
       statusEl.textContent = t('simulationDone', { paths, days, sigma: sigmaDailyPct });
+      
+      // Update volume-IL correlation display
+      calculateAndDisplayRiskMetrics(medianCagr, meanIl / days, days);
     }
 
     const runIlBtn = document.getElementById("runIlBtn");
