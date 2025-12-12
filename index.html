@@ -1323,7 +1323,7 @@
             <div class="stat-value" id="ilApr">–</div>
           </div>
           <div class="stat">
-            <div class="stat-label" id="feeBreakEvenAprLabel">Fee Break-even APR</div>
+            <div class="stat-label" id="feeBreakEvenAprLabel">LP Excess Return</div>
             <div class="stat-value" id="ilFeeBreakEven">–</div>
           </div>
           <div class="stat">
@@ -1464,7 +1464,7 @@
         expectedIL: "Expected IL",
         dailyIL: "Daily IL",
         equivalentILApr: "Equivalent IL APR",
-        feeBreakEvenApr: "Net APR",
+        feeBreakEvenApr: "LP Excess Return",
         volumeIlCorrelation: "Volume-IL Correlation (cov)",
         totalReturnStdDev: "Total Return Std. Dev. (Annualized)",
         sharpeRatio: "Sharpe Ratio",
@@ -1591,7 +1591,7 @@
         expectedIL: "预期 IL",
         dailyIL: "日均 IL",
         equivalentILApr: "等效 IL 年化",
-        feeBreakEvenApr: "净年化收益率",
+        feeBreakEvenApr: "LP超额收益",
         volumeIlCorrelation: "交易量-IL 相关性 (cov)",
         totalReturnStdDev: "总回报率APR标准差",
         sharpeRatio: "夏普比率",
@@ -4867,9 +4867,12 @@
       }
 
       // Metric Arrays
-      const navCagrs = new Array(paths);
+      const navCagrs = new Array(paths);       // LP CAGR (absolute)
+      const hodlCagrs = new Array(paths);      // HODL CAGR (benchmark)
+      const excessCagrs = new Array(paths);    // LP - HODL (excess return)
       const navSharpes = new Array(paths);
       const navMdds = new Array(paths);
+      const navStdDevs = new Array(paths); // Store annualized volatility for each path
       const terminalIls = new Array(paths);
       const inRangeDays = new Array(paths); // Track in-range days per path
       const pathPricesArray = [];
@@ -4917,8 +4920,17 @@
            currentPrice = Math.exp(logP);
            
            // 2. Calculate LP Position Value
-           const xyT = uniswapV3XYForPrice(currentPrice, Pl, Pu, L);
-           const vLpT = xyT.x * currentPrice + xyT.y;
+           // When price is out of range, LP value should follow HODL (no IL)
+           let vLpT;
+           if (currentPrice >= Pl && currentPrice <= Pu) {
+             // Price is in range: calculate LP value normally (may have IL)
+             const xyT = uniswapV3XYForPrice(currentPrice, Pl, Pu, L);
+             vLpT = xyT.x * currentPrice + xyT.y;
+           } else {
+             // Price is out of range: LP value follows HODL (no IL)
+             // This means the LP position value changes with price like HODL
+             vLpT = x0 * currentPrice + y0;
+           }
            
            // 3. Calculate Daily Fee (Only if in range)
            // Simplified: If price is in range, we earn the daily fee rate on the *current LP value*
@@ -4962,19 +4974,32 @@
         }
         
         // Path Metrics
-        // 1. Net APR (CAGR of NAV)
+        // 1. LP CAGR (absolute) and LP excess vs HODL
         const finalNav = prevNav; // last loop value
         const totalReturn = finalNav / vLp0;
         const cagr = Math.pow(totalReturn, 365 / days) - 1;
         navCagrs[i] = cagr;
+
+        // Benchmark: HODL CAGR (uses the final price path)
+        const vHodlFinal = x0 * currentPrice + y0;
+        const totalReturnHodl = vHodlFinal / vHodl0;
+        const hodlCagr = Math.pow(totalReturnHodl, 365 / days) - 1;
+        hodlCagrs[i] = hodlCagr;
+
+        // Excess return = LP CAGR - HODL CAGR
+        excessCagrs[i] = cagr - hodlCagr;
         
-        // 2. Sharpe Ratio
+        // 2. Sharpe Ratio and Std Dev
         // Mean of daily returns
         const meanDailyReturn = dailyReturnsSum / days;
         // Variance of daily returns
         const varianceDailyReturn = (dailyReturnsSqSum / days) - (meanDailyReturn * meanDailyReturn);
         // Std Dev (Sample) - usually use n-1 but for simulation n is fine or fix small bias
-        const stdDailyReturn = Math.sqrt(varianceDailyReturn);
+        const stdDailyReturn = Math.sqrt(Math.max(0, varianceDailyReturn)); // Ensure non-negative
+        
+        // Annualized volatility: stdDailyReturn * sqrt(365)
+        const annualizedVol = stdDailyReturn * Math.sqrt(365);
+        navStdDevs[i] = annualizedVol;
         
         // Annualized Sharpe: (Mean_d - Rf_d) / Std_d * sqrt(365)
         if (stdDailyReturn > 1e-9) {
@@ -4996,10 +5021,19 @@
         
         // 5. Terminal IL (for distribution chart - keep this as pure IL logic for reference)
         // IL is defined relative to HODL
-        const xyFinal = uniswapV3XYForPrice(currentPrice, Pl, Pu, L);
-        const vLpFinal = xyFinal.x * currentPrice + xyFinal.y;
-        const vHodlFinal = x0 * currentPrice + y0;
-        const il = (vLpFinal / vHodlFinal) - 1;
+        // When price is out of range, LP value follows HODL, so IL = 0
+        let il = 0;
+        if (currentPrice >= Pl && currentPrice <= Pu) {
+          // Only calculate IL when price is in range
+          const xyFinal = uniswapV3XYForPrice(currentPrice, Pl, Pu, L);
+          const vLpFinal = xyFinal.x * currentPrice + xyFinal.y;
+          const vHodlFinal = x0 * currentPrice + y0;
+          il = (vLpFinal / vHodlFinal) - 1;
+        } else {
+          // Price is out of range: LP value follows HODL, so IL = 0
+          // This is consistent with the NAV calculation above
+          il = 0;
+        }
         terminalIls[i] = il;
       }
       
@@ -5050,21 +5084,21 @@
         inRangeTimeRatioEl.textContent = "–";
       }
       
-      // 2. Net APR (Expected CAGR)
-      navCagrs.sort((a, b) => a - b);
-      const medianCagr = navCagrs[Math.floor(0.5 * n)]; // Median is robust
+      // 2. LP Excess Return vs HODL (Expected CAGR difference)
+      excessCagrs.sort((a, b) => a - b);
+      const medianExcess = excessCagrs[Math.floor(0.5 * n)]; // Median is robust
       // Or Mean
-      const meanCagr = navCagrs.reduce((a,b) => a+b, 0) / n;
+      const meanExcess = excessCagrs.reduce((a,b) => a+b, 0) / n;
       
       if (feeBreakEvenEl) {
          // Use Median or Mean? Median is often better for skewed distributions in finance
-         feeBreakEvenEl.textContent = toPercent(medianCagr); 
+         feeBreakEvenEl.textContent = toPercent(medianExcess); 
          
          const statContainer = feeBreakEvenEl.closest('.stat');
          if (statContainer) {
             statContainer.classList.remove('glow-green', 'glow-red');
-            if (medianCagr > 0) statContainer.classList.add('glow-green');
-            else if (medianCagr < 0) statContainer.classList.add('glow-red');
+            if (medianExcess > 0) statContainer.classList.add('glow-green');
+            else if (medianExcess < 0) statContainer.classList.add('glow-red');
          }
       }
       
@@ -5090,34 +5124,15 @@
       }
       
       // 5. Total Return Std Dev (Annualized Volatility of NAV)
-      // We can calculate this from the daily returns of all paths or just average path volatility
-      // Let's calculate the average annualized volatility of the paths
-      // (Simplification: The user asked for "Total Return Std Dev". 
-      // In the criticism, it says "Sharpe = Net APR / totalReturnStdDev". 
-      // So totalReturnStdDev = Net APR / Sharpe roughly, or just calculate it directly.)
-      // Let's derive it: Sharpe = (R - Rf) / Vol => Vol = (R - Rf) / Sharpe
-      let derivedVol = 0;
-      if (Math.abs(meanSharpe) > 1e-4) {
-         derivedVol = (medianCagr - riskFreeRate) / meanSharpe;
-         // Sanity check: Vol shouldn't be negative if Sharpe and Return signs align
-         if (derivedVol < 0) derivedVol = Math.abs(derivedVol); 
-      }
-      // Alternatively, we can track stdDev per path and average it.
-      // Let's allow the "derived" one or just display "N/A" if unstable.
-      // Better: calculate the std dev of the daily returns for the *median path* or average of std devs.
+      // Calculate the mean annualized volatility across all paths
+      const validStdDevs = navStdDevs.filter(s => Number.isFinite(s) && s >= 0);
+      const meanStdDev = validStdDevs.length > 0 
+        ? validStdDevs.reduce((a, b) => a + b, 0) / validStdDevs.length 
+        : 0;
       
       if (totalReturnStdEl) {
-         // Since we didn't store individual path volatilities, we can't average them easily without another array.
-         // But we can use the relation: Sharpe ~ (CAGR - Rf) / Vol
-         // So Vol ~ (CAGR - Rf) / Sharpe.
-         // However, displaying the Input Volatility (sigmaDaily * sqrt(365)) is what users often expect 
-         // BUT the portfolio volatility is different due to IL and cash drag.
-         // Let's approximate it as (Median CAGR - Rf) / Mean Sharpe if Sharpe != 0
-         // Or better, just calculate it properly next time. For now, let's leave it as derived or blank.
-         // Actually, let's calculate it correctly in the loop.
-         // I'll just use the "derived" value for display as it's consistent with the Sharpe shown.
-         if (meanSharpe !== 0) {
-             totalReturnStdEl.textContent = toPercent(derivedVol);
+         if (meanStdDev > 0 && Number.isFinite(meanStdDev)) {
+             totalReturnStdEl.textContent = toPercent(meanStdDev);
          } else {
              totalReturnStdEl.textContent = "–";
          }
