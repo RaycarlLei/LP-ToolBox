@@ -233,6 +233,44 @@
       background: rgba(34, 197, 94, 0.18);
     }
 
+    .vol-period-btn {
+      padding: 3px 8px;
+      font-size: 9px;
+      min-width: auto;
+      height: auto;
+      border-radius: 6px;
+      background: rgba(34, 197, 94, 0.12);
+      border: 1px solid rgba(34, 197, 94, 0.25);
+      color: var(--accent);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    .vol-period-btn:hover {
+      background: rgba(34, 197, 94, 0.22);
+      border-color: rgba(34, 197, 94, 0.4);
+      transform: translateY(-1px);
+    }
+
+    .vol-period-btn:active {
+      transform: translateY(0);
+      background: rgba(34, 197, 94, 0.18);
+    }
+
+    .vol-period-btn.active {
+      background: rgba(34, 197, 94, 0.3);
+      border-color: rgba(34, 197, 94, 0.6);
+      color: rgba(34, 197, 94, 1);
+      box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.4), 0 2px 8px rgba(34, 197, 94, 0.2);
+    }
+
+    .vol-period-btn.active:hover {
+      background: rgba(34, 197, 94, 0.35);
+      border-color: rgba(34, 197, 94, 0.7);
+    }
+
     .run-simulation-btn {
       padding: 10px 18px !important;
       font-size: 13px !important;
@@ -985,6 +1023,14 @@
             <span class="legend-dot" style="background: rgba(139, 92, 246, 0.9);"></span>
             <span id="token1LowLabel">Low Price</span>
           </div>
+          <div class="chart-legend-item" id="priceRatio01Legend">
+            <span class="legend-dot" style="background: rgba(236, 72, 153, 0.9);"></span>
+            <span id="priceRatio01Label">Price Ratio (Token0/Token1)</span>
+          </div>
+          <div class="chart-legend-item" id="priceRatio10Legend">
+            <span class="legend-dot" style="background: rgba(14, 165, 233, 0.9);"></span>
+            <span id="priceRatio10Label">Price Ratio (Token1/Token0)</span>
+          </div>
         </div>
       </div>
       <div id="poolInfo"></div>
@@ -1028,6 +1074,40 @@
           <div class="stat">
             <div class="stat-label" id="dailyVolume7dLabel">7-Day Daily Average Volume (USD)</div>
             <div class="stat-value" id="dailyVolume7dValue">N/A</div>
+            <div style="display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap;">
+              <button 
+                type="button"
+                class="vol-period-btn"
+                data-days="1"
+                id="volPeriodBtn1"
+              >
+                1
+              </button>
+              <button 
+                type="button"
+                class="vol-period-btn active"
+                data-days="7"
+                id="volPeriodBtn7"
+              >
+                7
+              </button>
+              <button 
+                type="button"
+                class="vol-period-btn"
+                data-days="14"
+                id="volPeriodBtn14"
+              >
+                14
+              </button>
+              <button 
+                type="button"
+                class="vol-period-btn"
+                data-days="30"
+                id="volPeriodBtn30"
+              >
+                30
+              </button>
+            </div>
           </div>
           <div class="stat">
             <div class="stat-label" id="dailyVolume7dStdDevLabel">7-Day Volume Std Dev (USD)</div>
@@ -1534,6 +1614,8 @@
         currentTvl: "Current TVL",
         dailyVolume7d: "7-Day Daily Average Volume (USD)",
         dailyVolume7dStdDev: "7-Day Volume Std Dev (USD)",
+        dailyVolumeND: "{days}-Day Daily Average Volume (USD)",
+        dailyVolumeNStdDev: "{days}-Day Volume Std Dev (USD)",
         feePercentage: "Fee Percentage (%)",
         feePercentagePlaceholder: "e.g. 0.3 for 0.3%",
         dailyFeeApr: "Daily Fee APR",
@@ -1585,7 +1667,7 @@
         parsedPoolData: "流动性池数据",
         keyMetrics: "关键指标",
         liveFromGeckoTerminal: "来自 GeckoTerminal 的实时数据",
-        lastDaysLiquidity: "最近 {days} 天的流动性和交易量",
+        lastDaysLiquidity: "最近 {days} 天交易对的价格和交易量",
 
         lookbackWindow: "拖动滑块改变时间窗口",
         rawGeckoTerminalResponse: "原始 GeckoTerminal 响应",
@@ -1667,6 +1749,8 @@
         currentTvl: "当前 TVL",
         dailyVolume7d: "7日日均交易量 (美元)",
         dailyVolume7dStdDev: "7日交易量标准差 (美元)",
+        dailyVolumeND: "{days}日日均交易量 (美元)",
+        dailyVolumeNStdDev: "{days}日交易量标准差 (美元)",
         feePercentage: "手续费百分比 (%)",
         feePercentagePlaceholder: "例如：0.3 表示 0.3%",
         dailyFeeApr: "日均手续费年化收益率",
@@ -1794,7 +1878,7 @@
           daysLabelSuffix.textContent = ' 天的流动性和交易量';
         } else {
           lastDaysLabel.textContent = 'Last ';
-          daysLabelSuffix.textContent = ' Days Liquidity & Volume';
+          daysLabelSuffix.textContent = ' Days Market Price & Volume';
         }
       }
       const tvlLineNote = document.getElementById('tvlLineNote');
@@ -2408,6 +2492,9 @@
       highData1 = [],
       lowData1 = [],
       hasPrice1 = false,
+      priceRatio01 = [],
+      priceRatio10 = [],
+      hasPriceRatio = false,
       hiddenStates = {}    // Save dataset hidden state
     ) {
       if (tvlVolumeChartInstance) {
@@ -2443,7 +2530,8 @@
             tension: 0.25,
             yAxisID: "y",
             pointRadius: 0,
-            pointHoverRadius: 2.5
+            pointHoverRadius: 2.5,
+            hidden: true
           },
           {
             type: "line",
@@ -2455,7 +2543,8 @@
             tension: 0.25,
             yAxisID: "y",
             pointRadius: 0,
-            pointHoverRadius: 2.5
+            pointHoverRadius: 2.5,
+            hidden: true
           }
         );
       }
@@ -2472,7 +2561,8 @@
             tension: 0.25,
             yAxisID: "y",
             pointRadius: 0,
-            pointHoverRadius: 2.5
+            pointHoverRadius: 2.5,
+            hidden: true
           },
           {
             type: "line",
@@ -2484,9 +2574,47 @@
             tension: 0.25,
             yAxisID: "y",
             pointRadius: 0,
-            pointHoverRadius: 2.5
+            pointHoverRadius: 2.5,
+            hidden: true
           }
         );
+      }
+
+      // Add price ratio lines
+      // Get current ratio type from button state
+      const priceRatioStat = document.getElementById("priceRatioStat");
+      const currentRatioType = priceRatioStat ? priceRatioStat.getAttribute("data-ratio-type") : "token1-token0";
+      
+      if (hasPriceRatio) {
+        // Add token0/token1 ratio line
+        datasets.push({
+          type: "line",
+          label: `Price Ratio (${currentBaseSymbol}/${currentQuoteSymbol})`,
+          data: priceRatio01,
+          borderColor: "rgba(236, 72, 153, 0.9)",  // pink
+          backgroundColor: "rgba(236, 72, 153, 0.12)",
+          borderWidth: 1.5,
+          tension: 0.25,
+          yAxisID: "y",
+          pointRadius: 0,
+          pointHoverRadius: 2.5,
+          hidden: currentRatioType !== "token0-token1"  // Hide if not selected
+        });
+        
+        // Add token1/token0 ratio line
+        datasets.push({
+          type: "line",
+          label: `Price Ratio (${currentQuoteSymbol}/${currentBaseSymbol})`,
+          data: priceRatio10,
+          borderColor: "rgba(14, 165, 233, 0.9)",  // sky blue
+          backgroundColor: "rgba(14, 165, 233, 0.12)",
+          borderWidth: 1.5,
+          tension: 0.25,
+          yAxisID: "y",
+          pointRadius: 0,
+          pointHoverRadius: 2.5,
+          hidden: currentRatioType !== "token1-token0"  // Hide if not selected
+        });
       }
 
       datasets.push({
@@ -2531,15 +2659,25 @@
                   const label = ctx.dataset.label || "";
                   const value = ctx.parsed.y;
                   if (value == null) return "";
-                  const formatted =
-                    Math.abs(value) >= 1e9
-                      ? (value / 1e9).toFixed(2) + "B"
-                      : Math.abs(value) >= 1e6
-                      ? (value / 1e6).toFixed(2) + "M"
-                      : Math.abs(value) >= 1e3
-                      ? (value / 1e3).toFixed(2) + "K"
-                      : value.toFixed(2);
-                  return `${label}: ${formatted} USD`;
+                  
+                  // Check if this is a price ratio dataset
+                  const isPriceRatio = label.includes("Price Ratio");
+                  
+                  if (isPriceRatio) {
+                    // Format price ratio with appropriate precision
+                    return `${label}: ${value.toFixed(6)}`;
+                  } else {
+                    // Format USD values
+                    const formatted =
+                      Math.abs(value) >= 1e9
+                        ? (value / 1e9).toFixed(2) + "B"
+                        : Math.abs(value) >= 1e6
+                        ? (value / 1e6).toFixed(2) + "M"
+                        : Math.abs(value) >= 1e3
+                        ? (value / 1e3).toFixed(2) + "K"
+                        : value.toFixed(2);
+                    return `${label}: ${formatted} USD`;
+                  }
                 }
               }
             }
@@ -2641,7 +2779,7 @@
           if (highDatasetIndex !== -1) {
             token0HighLegendEl.setAttribute("data-dataset-index", highDatasetIndex);
             token0HighLegendEl.style.cursor = "pointer";
-            token0HighLegendEl.classList.remove("legend-hidden");
+            token0HighLegendEl.classList.add("legend-hidden");  // Default hidden
           }
         }
       }
@@ -2652,7 +2790,7 @@
           if (lowDatasetIndex !== -1) {
             token0LowLegendEl.setAttribute("data-dataset-index", lowDatasetIndex);
             token0LowLegendEl.style.cursor = "pointer";
-            token0LowLegendEl.classList.remove("legend-hidden");
+            token0LowLegendEl.classList.add("legend-hidden");  // Default hidden
           }
         }
       }
@@ -2675,7 +2813,7 @@
           if (highDatasetIndex !== -1) {
             token1HighLegendEl.setAttribute("data-dataset-index", highDatasetIndex);
             token1HighLegendEl.style.cursor = "pointer";
-            token1HighLegendEl.classList.remove("legend-hidden");
+            token1HighLegendEl.classList.add("legend-hidden");  // Default hidden
           }
         }
       }
@@ -2686,7 +2824,7 @@
           if (lowDatasetIndex !== -1) {
             token1LowLegendEl.setAttribute("data-dataset-index", lowDatasetIndex);
             token1LowLegendEl.style.cursor = "pointer";
-            token1LowLegendEl.classList.remove("legend-hidden");
+            token1LowLegendEl.classList.add("legend-hidden");  // Default hidden
           }
         }
       }
@@ -2695,6 +2833,55 @@
       }
       if (token1LowLabelEl && hasPrice1) {
         token1LowLabelEl.textContent = `${currentQuoteSymbol} Low`;
+      }
+
+      // Update price ratio legends
+      const priceRatio01LegendEl = document.getElementById("priceRatio01Legend");
+      const priceRatio10LegendEl = document.getElementById("priceRatio10Legend");
+      const priceRatio01LabelEl = document.getElementById("priceRatio01Label");
+      const priceRatio10LabelEl = document.getElementById("priceRatio10Label");
+      
+      if (priceRatio01LegendEl) {
+        priceRatio01LegendEl.style.display = hasPriceRatio ? "inline-flex" : "none";
+        if (hasPriceRatio) {
+          const ratio01DatasetIndex = datasets.findIndex(d => d.label === `Price Ratio (${currentBaseSymbol}/${currentQuoteSymbol})`);
+          if (ratio01DatasetIndex !== -1) {
+            priceRatio01LegendEl.setAttribute("data-dataset-index", ratio01DatasetIndex);
+            priceRatio01LegendEl.style.cursor = "pointer";
+            // Set initial hidden state based on button state
+            const isHidden = currentRatioType !== "token0-token1";
+            if (isHidden) {
+              priceRatio01LegendEl.classList.add("legend-hidden");
+            } else {
+              priceRatio01LegendEl.classList.remove("legend-hidden");
+            }
+          }
+        }
+      }
+      
+      if (priceRatio10LegendEl) {
+        priceRatio10LegendEl.style.display = hasPriceRatio ? "inline-flex" : "none";
+        if (hasPriceRatio) {
+          const ratio10DatasetIndex = datasets.findIndex(d => d.label === `Price Ratio (${currentQuoteSymbol}/${currentBaseSymbol})`);
+          if (ratio10DatasetIndex !== -1) {
+            priceRatio10LegendEl.setAttribute("data-dataset-index", ratio10DatasetIndex);
+            priceRatio10LegendEl.style.cursor = "pointer";
+            // Set initial hidden state based on button state
+            const isHidden = currentRatioType !== "token1-token0";
+            if (isHidden) {
+              priceRatio10LegendEl.classList.add("legend-hidden");
+            } else {
+              priceRatio10LegendEl.classList.remove("legend-hidden");
+            }
+          }
+        }
+      }
+      
+      if (priceRatio01LabelEl && hasPriceRatio) {
+        priceRatio01LabelEl.textContent = `Price Ratio (${currentBaseSymbol}/${currentQuoteSymbol})`;
+      }
+      if (priceRatio10LabelEl && hasPriceRatio) {
+        priceRatio10LabelEl.textContent = `Price Ratio (${currentQuoteSymbol}/${currentBaseSymbol})`;
       }
 
       // Add click functionality to Volume legend
@@ -2763,7 +2950,7 @@
       if (!storedOhlcvData || storedOhlcvData.length === 0) {
         // If no stored data, clear chart
         const ctx = document.getElementById("tvlVolumeChart").getContext("2d");
-        buildTvlVolumeChart(ctx, [], [], [], false, [], [], [], [], false, [], [], false, {});
+        buildTvlVolumeChart(ctx, [], [], [], false, [], [], [], [], false, [], [], false, [], [], false, {});
         return;
       }
 
@@ -2779,9 +2966,12 @@
       const lowData0 = [];   // token0 low
       const highData1 = [];  // token1 high
       const lowData1 = [];   // token1 low
+      const priceRatio01 = [];  // token0/token1 price ratio
+      const priceRatio10 = [];  // token1/token0 price ratio
       let hasTvl = false;
       let hasPrice0 = false;
       let hasPrice1 = false;
+      let hasPriceRatio = false;
 
       displayData.forEach(entry => {
         // 数据格式: [ts, open0, high0, low0, close0, volume, tvl, trades, open1, high1, low1, close1]
@@ -2836,6 +3026,33 @@
           lowData1.push(null);
         }
 
+        // Calculate price ratio
+        // Use close price if available, otherwise use average of high and low
+        let price0 = null;
+        let price1 = null;
+        
+        if (_close0 != null && !isNaN(Number(_close0)) && Number(_close0) > 0) {
+          price0 = Number(_close0);
+        } else if (high0 != null && low0 != null && !isNaN(Number(high0)) && !isNaN(Number(low0)) && Number(high0) > 0 && Number(low0) > 0) {
+          price0 = (Number(high0) + Number(low0)) / 2;
+        }
+        
+        if (_close1 != null && !isNaN(Number(_close1)) && Number(_close1) > 0) {
+          price1 = Number(_close1);
+        } else if (high1 != null && low1 != null && !isNaN(Number(high1)) && !isNaN(Number(low1)) && Number(high1) > 0 && Number(low1) > 0) {
+          price1 = (Number(high1) + Number(low1)) / 2;
+        }
+        
+        // Calculate ratios: token0/token1 and token1/token0
+        if (price0 != null && price1 != null && price0 > 0 && price1 > 0) {
+          priceRatio01.push(price0 / price1);  // token0/token1
+          priceRatio10.push(price1 / price0);  // token1/token0
+          hasPriceRatio = true;
+        } else {
+          priceRatio01.push(null);
+          priceRatio10.push(null);
+        }
+
         // TVL
         if (tvl != null && !isNaN(Number(tvl)) && Number(tvl) > 0) {
           tvlData.push(Number(tvl));
@@ -2872,6 +3089,9 @@
         highData1,
         lowData1,
         hasPrice1,
+        priceRatio01,
+        priceRatio10,
+        hasPriceRatio,
         hiddenStates  // Pass hidden state
       );
     }
@@ -3518,69 +3738,17 @@
           ilUpperEl.value = (currentPrice * 1.2).toFixed(4);
         }
 
-        // 计算7日日均成交量
-        let volume7d = "N/A";
-        let volume7dRaw = null; // 保存原始数值用于 APR 计算
-        let volume7dStdDev = "N/A"; // 7日交易量标准差
-        let volume7dStdDevRaw = null; // 保存标准差原始数值用于风险指标计算
-        if (storedOhlcvData.length > 0) {
-          // 取最后7天的数据
-          const last7Days = storedOhlcvData.slice(-7);
-          // 提取每日成交量（volume在索引5）
-          const dailyVolumes = last7Days.map(entry => {
-            const vol = entry[5] || 0; // volume在索引5
-            return Number.isFinite(vol) ? Number(vol) : 0;
-          });
-          
-          // 计算总成交量
-          const totalVolume = dailyVolumes.reduce((sum, vol) => sum + vol, 0);
-          
-          // 计算7日日均（总成交量除以7）
-          const dailyAverage = totalVolume / 7;
-          volume7dRaw = dailyAverage; // 保存原始数值
-          
-          if (dailyAverage > 0) {
-            // 格式化显示
-            if (Math.abs(dailyAverage) >= 1e9) {
-              volume7d = (dailyAverage / 1e9).toFixed(2) + "B";
-            } else if (Math.abs(dailyAverage) >= 1e6) {
-              volume7d = (dailyAverage / 1e6).toFixed(2) + "M";
-            } else if (Math.abs(dailyAverage) >= 1e3) {
-              volume7d = (dailyAverage / 1e3).toFixed(2) + "K";
-            } else {
-              volume7d = dailyAverage.toFixed(2);
-            }
-            
-            // 计算标准差
-            const variance = dailyVolumes.reduce((sum, vol) => {
-              const diff = vol - dailyAverage;
-              return sum + (diff * diff);
-            }, 0) / 7;
-            const stdDev = Math.sqrt(variance);
-            
-            // 保存原始标准差值（用于风险指标计算）
-            volume7dStdDevRaw = stdDev;
-            
-            // 格式化标准差显示
-            if (stdDev > 0) {
-              if (Math.abs(stdDev) >= 1e9) {
-                volume7dStdDev = (stdDev / 1e9).toFixed(2) + "B";
-              } else if (Math.abs(stdDev) >= 1e6) {
-                volume7dStdDev = (stdDev / 1e6).toFixed(2) + "M";
-              } else if (Math.abs(stdDev) >= 1e3) {
-                volume7dStdDev = (stdDev / 1e3).toFixed(2) + "K";
-              } else {
-                volume7dStdDev = stdDev.toFixed(2);
-              }
-            } else {
-              volume7dStdDev = "0";
-              volume7dStdDevRaw = 0;
-            }
-          } else {
-            volume7d = "0";
-            volume7dStdDev = "0";
-          }
+        // 当前选择的天数（默认7天，全局变量）
+        if (typeof window.selectedVolumeDays === 'undefined') {
+          window.selectedVolumeDays = 7;
         }
+
+        // 计算日均成交量（使用当前选择的天数，调用全局函数）
+        const volumeResult = calculateDailyAverageVolume(window.selectedVolumeDays);
+        let volume7d = volumeResult.volumeDisplay;
+        let volume7dRaw = volumeResult.volumeRaw;
+        let volume7dStdDev = volumeResult.volumeStdDev;
+        let volume7dStdDevRaw = volumeResult.volumeStdDevRaw;
         
         // 更新7日日均成交量显示
         const volume7dEl = document.getElementById("volume7dValue");
@@ -3672,6 +3840,9 @@
         // 设置手续费 APR 计算功能
         setupFeeAprCalculation();
         
+        // 设置时间段按钮
+        setupVolumePeriodButtons();
+        
         // 数据加载完成后，自动触发一次手续费计算
         setTimeout(() => {
           const feePercentageInput = document.getElementById("feePercentageInput");
@@ -3691,6 +3862,87 @@
       } finally {
         loadingEl.textContent = "";
       }
+    }
+
+    // 计算指定天数的日均成交量（全局函数）
+    function calculateDailyAverageVolume(days) {
+      if (!storedOhlcvData || storedOhlcvData.length === 0) {
+        return {
+          volumeDisplay: "N/A",
+          volumeRaw: null,
+          volumeStdDev: "N/A",
+          volumeStdDevRaw: null
+        };
+      }
+
+      let volumeDisplay = "N/A";
+      let volumeRaw = null;
+      let volumeStdDev = "N/A";
+      let volumeStdDevRaw = null;
+      
+      // 取最后N天的数据
+      const lastNDays = storedOhlcvData.slice(-days);
+      // 提取每日成交量（volume在索引5）
+      const dailyVolumes = lastNDays.map(entry => {
+        const vol = entry[5] || 0; // volume在索引5
+        return Number.isFinite(vol) ? Number(vol) : 0;
+      });
+      
+      // 计算总成交量
+      const totalVolume = dailyVolumes.reduce((sum, vol) => sum + vol, 0);
+      
+      // 计算日均（总成交量除以天数）
+      const dailyAverage = totalVolume / days;
+      volumeRaw = dailyAverage; // 保存原始数值
+      
+      if (dailyAverage > 0) {
+        // 格式化显示
+        if (Math.abs(dailyAverage) >= 1e9) {
+          volumeDisplay = (dailyAverage / 1e9).toFixed(2) + "B";
+        } else if (Math.abs(dailyAverage) >= 1e6) {
+          volumeDisplay = (dailyAverage / 1e6).toFixed(2) + "M";
+        } else if (Math.abs(dailyAverage) >= 1e3) {
+          volumeDisplay = (dailyAverage / 1e3).toFixed(2) + "K";
+        } else {
+          volumeDisplay = dailyAverage.toFixed(2);
+        }
+        
+        // 计算标准差
+        const variance = dailyVolumes.reduce((sum, vol) => {
+          const diff = vol - dailyAverage;
+          return sum + (diff * diff);
+        }, 0) / days;
+        const stdDev = Math.sqrt(variance);
+        
+        // 保存原始标准差值（用于风险指标计算）
+        volumeStdDevRaw = stdDev;
+        
+        // 格式化标准差显示
+        if (stdDev > 0) {
+          if (Math.abs(stdDev) >= 1e9) {
+            volumeStdDev = (stdDev / 1e9).toFixed(2) + "B";
+          } else if (Math.abs(stdDev) >= 1e6) {
+            volumeStdDev = (stdDev / 1e6).toFixed(2) + "M";
+          } else if (Math.abs(stdDev) >= 1e3) {
+            volumeStdDev = (stdDev / 1e3).toFixed(2) + "K";
+          } else {
+            volumeStdDev = stdDev.toFixed(2);
+          }
+        } else {
+          volumeStdDev = "0";
+          volumeStdDevRaw = 0;
+        }
+      } else {
+        volumeDisplay = "0";
+        volumeStdDev = "0";
+      }
+      
+      return {
+        volumeDisplay,
+        volumeRaw,
+        volumeStdDev,
+        volumeStdDevRaw
+      };
     }
 
     function setupFeeAprCalculation() {
@@ -3828,6 +4080,74 @@
       }, 100);
     }
 
+    // 更新日均交易量显示（根据选择的天数）
+    function updateVolumeDisplay(days) {
+      if (typeof calculateDailyAverageVolume === 'undefined' || !storedOhlcvData || storedOhlcvData.length === 0) {
+        return;
+      }
+
+      // 计算指定天数的日均交易量
+      const volumeResult = calculateDailyAverageVolume(days);
+      
+      // 更新显示
+      const dailyVolume7dValueEl = document.getElementById("dailyVolume7dValue");
+      const dailyVolume7dStdDevValueEl = document.getElementById("dailyVolume7dStdDevValue");
+      const dailyVolume7dLabel = document.getElementById("dailyVolume7dLabel");
+      const dailyVolume7dStdDevLabel = document.getElementById("dailyVolume7dStdDevLabel");
+      
+      if (dailyVolume7dValueEl) {
+        dailyVolume7dValueEl.textContent = volumeResult.volumeDisplay !== "N/A" ? `$${volumeResult.volumeDisplay}` : "N/A";
+        dailyVolume7dValueEl.setAttribute("data-raw-value", volumeResult.volumeRaw || "");
+      }
+      
+      if (dailyVolume7dStdDevValueEl) {
+        dailyVolume7dStdDevValueEl.textContent = volumeResult.volumeStdDev !== "N/A" ? `$${volumeResult.volumeStdDev}` : "N/A";
+        if (volumeResult.volumeStdDevRaw !== null && Number.isFinite(volumeResult.volumeStdDevRaw)) {
+          dailyVolume7dStdDevValueEl.setAttribute("data-raw-value", volumeResult.volumeStdDevRaw.toString());
+        } else {
+          dailyVolume7dStdDevValueEl.removeAttribute("data-raw-value");
+        }
+      }
+      
+      // 更新标签文本
+      if (dailyVolume7dLabel) {
+        dailyVolume7dLabel.textContent = t('dailyVolumeND', { days: days });
+      }
+      
+      if (dailyVolume7dStdDevLabel) {
+        dailyVolume7dStdDevLabel.textContent = t('dailyVolumeNStdDev', { days: days });
+      }
+      
+      // 触发手续费重新计算（因为日均交易量改变了）
+      const feePercentageInput = document.getElementById("feePercentageInput");
+      if (feePercentageInput) {
+        feePercentageInput.dispatchEvent(new Event('input'));
+      }
+    }
+
+    // 设置时间段按钮
+    function setupVolumePeriodButtons() {
+      const buttons = document.querySelectorAll('.vol-period-btn');
+      
+      buttons.forEach(button => {
+        button.addEventListener('click', function() {
+          const days = parseInt(this.getAttribute('data-days'));
+          
+          // 更新全局变量
+          window.selectedVolumeDays = days;
+          
+          // 更新按钮样式
+          buttons.forEach(btn => {
+            btn.classList.remove('active');
+          });
+          this.classList.add('active');
+          
+          // 更新显示
+          updateVolumeDisplay(days);
+        });
+      });
+    }
+
     function setupPriceRatioToggle() {
       const priceRatioStat = document.getElementById("priceRatioStat");
       if (!priceRatioStat) return;
@@ -3843,16 +4163,55 @@
         const labelEl = document.getElementById("priceRatioLabel");
         const valueEl = document.getElementById("priceRatioValue");
         
+        let newType;
         if (currentType === "token1-token0") {
           // 切换到 token0/token1
-          this.setAttribute("data-ratio-type", "token0-token1");
+          newType = "token0-token1";
+          this.setAttribute("data-ratio-type", newType);
           if (labelEl) labelEl.textContent = `${baseSymbol} / ${quoteSymbol}`;
           if (valueEl) valueEl.textContent = `1 ${baseSymbol} = ${token0PerToken1} ${quoteSymbol}`;
         } else {
           // 切换到 token1/token0
-          this.setAttribute("data-ratio-type", "token1-token0");
+          newType = "token1-token0";
+          this.setAttribute("data-ratio-type", newType);
           if (labelEl) labelEl.textContent = `${quoteSymbol} / ${baseSymbol}`;
           if (valueEl) valueEl.textContent = `1 ${quoteSymbol} = ${token1PerToken0} ${baseSymbol}`;
+        }
+        
+        // Update chart to show/hide corresponding price ratio line
+        if (tvlVolumeChartInstance && tvlVolumeChartInstance.data && tvlVolumeChartInstance.data.datasets) {
+          const ratio01Label = `Price Ratio (${currentBaseSymbol}/${currentQuoteSymbol})`;
+          const ratio10Label = `Price Ratio (${currentQuoteSymbol}/${currentBaseSymbol})`;
+          
+          tvlVolumeChartInstance.data.datasets.forEach((dataset) => {
+            if (dataset.label === ratio01Label) {
+              dataset.hidden = newType !== "token0-token1";
+            } else if (dataset.label === ratio10Label) {
+              dataset.hidden = newType !== "token1-token0";
+            }
+          });
+          
+          tvlVolumeChartInstance.update('none');
+          
+          // Update legend visual state
+          const priceRatio01LegendEl = document.getElementById("priceRatio01Legend");
+          const priceRatio10LegendEl = document.getElementById("priceRatio10Legend");
+          
+          if (priceRatio01LegendEl) {
+            if (newType === "token0-token1") {
+              priceRatio01LegendEl.classList.remove("legend-hidden");
+            } else {
+              priceRatio01LegendEl.classList.add("legend-hidden");
+            }
+          }
+          
+          if (priceRatio10LegendEl) {
+            if (newType === "token1-token0") {
+              priceRatio10LegendEl.classList.remove("legend-hidden");
+            } else {
+              priceRatio10LegendEl.classList.add("legend-hidden");
+            }
+          }
         }
       };
     }
@@ -4903,7 +5262,13 @@
       stdEl.textContent = "–";
       if (aprEl) aprEl.textContent = "–";
       if (realizedFeeAprEl) realizedFeeAprEl.textContent = "–";
-      if (netAprApproxEl) netAprApproxEl.textContent = "–";
+      if (netAprApproxEl) {
+        netAprApproxEl.textContent = "–";
+        const statContainer = netAprApproxEl.closest('.stat');
+        if (statContainer) {
+          statContainer.classList.remove('glow-green', 'glow-red');
+        }
+      }
       if (feeBreakEvenEl) {
         feeBreakEvenEl.textContent = "–";
         const statContainer = feeBreakEvenEl.closest('.stat');
@@ -5282,8 +5647,19 @@
         if (netAprApproxEl && equivalentILAprVal !== null && Number.isFinite(medFeeApr) && Number.isFinite(equivalentILAprVal)) {
           const netAprApprox = (1 + medFeeApr) * (1 + equivalentILAprVal) - 1;
           netAprApproxEl.textContent = toPercent(netAprApprox);
+          
+          const statContainer = netAprApproxEl.closest('.stat');
+          if (statContainer) {
+            statContainer.classList.remove('glow-green', 'glow-red');
+            if (netAprApprox > 0) statContainer.classList.add('glow-green');
+            else if (netAprApprox < 0) statContainer.classList.add('glow-red');
+          }
         } else if (netAprApproxEl) {
           netAprApproxEl.textContent = "–";
+          const statContainer = netAprApproxEl.closest('.stat');
+          if (statContainer) {
+            statContainer.classList.remove('glow-green', 'glow-red');
+          }
         }
       }
       
